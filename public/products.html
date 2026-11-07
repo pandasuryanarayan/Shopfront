@@ -17,12 +17,12 @@
       <nav class="breadcrumb" aria-label="Breadcrumb">
         <a href="/">Home</a><span>/</span><span class="current" id="crumb-current">All products</span>
       </nav>
-      <div class="row-between" style="margin-bottom:24px">
+      <div class="row-between page-head" style="margin-bottom:24px">
         <div>
           <h1 class="h1" id="page-title">All products</h1>
           <p class="lead" id="page-sub">Free delivery over ₹499</p>
         </div>
-        <label class="row" style="gap:8px;font-size:14px">
+        <label class="row sort-wrap" style="gap:8px;font-size:14px">
           <span class="muted">Sort by</span>
           <select class="select" id="sort" style="width:auto;height:44px">
             <option value="popular">Popularity</option>
@@ -33,6 +33,22 @@
           </select>
         </label>
       </div>
+      <div class="mobile-toolbar">
+        <button class="btn btn-secondary" type="button" id="open-filters">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          Filters<span class="filter-count hide" id="filter-count">0</span>
+        </button>
+        <select class="select" id="sort-mobile" aria-label="Sort products">
+          <option value="popular">Popularity</option>
+          <option value="newest">Newest first</option>
+          <option value="price_asc">Price: low to high</option>
+          <option value="price_desc">Price: high to low</option>
+          <option value="rating">Customer rating</option>
+        </select>
+      </div>
+
+      <div class="filter-backdrop" id="filter-backdrop" hidden></div>
+
       <div class="listing-layout">
         <aside class="filters card card-tight" id="filters"></aside>
         <div>

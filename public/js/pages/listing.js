@@ -69,6 +69,10 @@ function renderFilters(categories) {
       <div class="size-options">
         ${SIZES.map((s) => `<button class="size-option" type="button" data-size="${esc(s)}" aria-pressed="${state.size === s}">${esc(s)}</button>`).join('')}
       </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-secondary" type="button" id="sheet-clear">Clear all</button>
+      <button class="btn btn-primary" type="button" id="sheet-apply">Show results</button>
     </div>`;
 
   qsa('input[name=category]').forEach((el) => el.addEventListener('change', () => {
@@ -89,11 +93,32 @@ function renderFilters(categories) {
     update();
   }));
 
-  qs('#clear-filters').addEventListener('click', () => {
+  const clearAll = () => {
     Object.assign(state, { category: '', size: '', minPrice: '', maxPrice: '', page: 1 });
     update();
-  });
+  };
+  qs('#clear-filters').addEventListener('click', clearAll);
+  qs('#sheet-clear')?.addEventListener('click', clearAll);
+  qs('#sheet-apply')?.addEventListener('click', closeSheet);
 }
+
+/* ---------- mobile filter sheet ---------- */
+function openSheet() {
+  const panel = qs('.filters');
+  panel.classList.add('is-open');
+  qs('#filter-backdrop').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSheet() {
+  qs('.filters')?.classList.remove('is-open');
+  const backdrop = qs('#filter-backdrop');
+  if (backdrop) backdrop.hidden = true;
+  document.body.style.overflow = '';
+}
+
+const activeFilterCount = () =>
+  [state.category, state.size, state.q, state.minPrice || state.maxPrice].filter(Boolean).length;
 
 function renderActiveFilters(categories) {
   const chips = [];
@@ -144,6 +169,15 @@ let categories = [];
 async function update() {
   writeUrl();
   renderActiveFilters(categories);
+
+  const count = activeFilterCount();
+  const badge = qs('#filter-count');
+  if (badge) {
+    badge.textContent = String(count);
+    badge.classList.toggle('hide', count === 0);
+  }
+  qs('#sort') && (qs('#sort').value = state.sort);
+  qs('#sort-mobile') && (qs('#sort-mobile').value = state.sort);
   qsa('[data-size]').forEach((el) => el.setAttribute('aria-pressed', String(state.size === el.dataset.size)));
   qsa('input[name=category]').forEach((el) => { el.checked = el.value === state.category; });
 
@@ -157,6 +191,8 @@ async function update() {
     qs('#page-title').textContent = title;
     qs('#crumb-current').textContent = title;
     qs('#page-sub').textContent = `${data.total} product${data.total === 1 ? '' : 's'}  ·  Free delivery over ₹499`;
+    const apply = qs('#sheet-apply');
+    if (apply) apply.textContent = `Show ${data.total} product${data.total === 1 ? '' : 's'}`;
     document.title = `${title} — Shopfront`;
 
     qs('#grid').innerHTML = data.items.length
@@ -177,7 +213,13 @@ async function update() {
 async function init() {
   readUrl();
   qs('#sort').value = state.sort;
-  qs('#sort').addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; update(); });
+  const onSort = (e) => { state.sort = e.target.value; state.page = 1; update(); };
+  qs('#sort').addEventListener('change', onSort);
+  qs('#sort-mobile')?.addEventListener('change', onSort);
+
+  qs('#open-filters')?.addEventListener('click', openSheet);
+  qs('#filter-backdrop')?.addEventListener('click', closeSheet);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
   categories = await loadCategories();
   renderFilters(categories);
   update();
