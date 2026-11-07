@@ -50,7 +50,13 @@ export function createApp() {
   app.use('/api', apiLimiter, catalogRoutes);
   app.use('/api/cart', apiLimiter, cartRoutes);
   app.use('/api/orders', apiLimiter, orderRoutes);
-  app.use('/api/admin', apiLimiter, adminRoutes);
+  // Admin surface lives under /mukhiya (see the note in README) — both the UI
+  // route and the API mount moved here together.
+  app.use('/api/mukhiya', apiLimiter, adminRoutes);
+
+  // Admin panel. Registered before the static handler so the clean URL wins.
+  app.get('/mukhiya', (_req, res) => res.sendFile('admin.html', { root: config.publicDir }));
+  app.get('/admin.html', (_req, res) => res.redirect(301, '/mukhiya'));
 
   app.use(express.static(config.publicDir, {
     extensions: ['html'],

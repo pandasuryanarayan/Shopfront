@@ -65,12 +65,12 @@ export const api = {
   order: (reference) => request(`/orders/${encodeURIComponent(reference)}`),
   cancelOrder: (reference) => request(`/orders/${encodeURIComponent(reference)}/cancel`, { method: 'POST' }),
 
-  // admin
-  adminStats: () => request('/admin/stats'),
-  adminProducts: (q) => request(`/admin/products${qs({ q })}`),
-  adminCreateProduct: (body) => request('/admin/products', { method: 'POST', body }),
-  adminUpdateProduct: (id, body) => request(`/admin/products/${id}`, { method: 'PATCH', body }),
-  adminArchiveProduct: (id) => request(`/admin/products/${id}`, { method: 'DELETE' }),
-  adminOrders: (status) => request(`/admin/orders${qs({ status })}`),
-  adminSetOrderStatus: (reference, status) => request(`/admin/orders/${encodeURIComponent(reference)}/status`, { method: 'PATCH', body: { status } }),
+  // admin (served under /mukhiya)
+  adminStats: () => request('/mukhiya/stats'),
+  adminProducts: (q) => request(`/mukhiya/products${qs({ q })}`),
+  adminCreateProduct: (body) => request('/mukhiya/products', { method: 'POST', body }),
+  adminUpdateProduct: (id, body) => request(`/mukhiya/products/${id}`, { method: 'PATCH', body }),
+  adminArchiveProduct: (id) => request(`/mukhiya/products/${id}`, { method: 'DELETE' }),
+  adminOrders: (status) => request(`/mukhiya/orders${qs({ status })}`),
+  adminSetOrderStatus: (reference, status) => request(`/mukhiya/orders/${encodeURIComponent(reference)}/status`, { method: 'PATCH', body: { status } }),
 };

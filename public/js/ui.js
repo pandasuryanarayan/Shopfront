@@ -210,7 +210,7 @@ export function mountChrome({ active = '' } = {}) {
     if (account) {
       if (store.user) {
         account.textContent = store.user.name.split(' ')[0];
-        account.href = store.user.role === 'admin' ? '/admin.html' : '/orders.html';
+        account.href = store.user.role === 'admin' ? '/mukhiya' : '/orders.html';
       } else {
         account.textContent = 'Sign in';
         account.href = '/login.html';

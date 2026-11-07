@@ -21,7 +21,7 @@ The UI follows a design system that lives in Figma — tokens, components and si
 - Order history with status tracking and self-service cancellation
 - Email + password authentication (bcrypt hashing, JWT in an httpOnly cookie)
 
-**Admin dashboard**
+**Admin dashboard** — served at `/mukhiya`
 - Revenue, orders, AOV and customer KPIs
 - Monthly revenue chart, top categories, low-stock alerts
 - Order management with status transitions
@@ -55,7 +55,7 @@ The server seeds itself automatically if the catalogue is empty, so `npm run see
 | Customer | `demo@shopfront.in`  | `Demo@1234`  |
 | Admin    | `admin@shopfront.in` | `Admin@1234` |
 
-Admin dashboard: `/admin.html`
+Admin dashboard: **`/mukhiya`** (`/admin.html` redirects there)
 
 ### Scripts
 
@@ -126,13 +126,13 @@ a `Authorization: Bearer <token>` header also works for API clients.
 | GET    | `/api/orders`                     | user   | Order history                      |
 | GET    | `/api/orders/:reference`          | user   | Single order                       |
 | POST   | `/api/orders/:reference/cancel`   | user   | Cancel (restocks items)            |
-| GET    | `/api/admin/stats`                | admin  | Dashboard aggregates               |
-| GET    | `/api/admin/products`             | admin  | Catalogue for admin                |
-| POST   | `/api/admin/products`             | admin  | Create a product                   |
-| PATCH  | `/api/admin/products/:id`         | admin  | Update a product                   |
-| DELETE | `/api/admin/products/:id`         | admin  | Archive a product                  |
-| GET    | `/api/admin/orders`               | admin  | All orders                         |
-| PATCH  | `/api/admin/orders/:ref/status`   | admin  | Move an order through the pipeline |
+| GET    | `/api/mukhiya/stats`              | admin  | Dashboard aggregates               |
+| GET    | `/api/mukhiya/products`           | admin  | Catalogue for admin                |
+| POST   | `/api/mukhiya/products`           | admin  | Create a product                   |
+| PATCH  | `/api/mukhiya/products/:id`       | admin  | Update a product                   |
+| DELETE | `/api/mukhiya/products/:id`       | admin  | Archive a product                  |
+| GET    | `/api/mukhiya/orders`             | admin  | All orders                         |
+| PATCH  | `/api/mukhiya/orders/:ref/status` | admin  | Move an order through the pipeline |
 
 Demo coupons: `WELCOME10` (10% off, min ₹999) and `FLAT250` (₹250 off, min ₹1,999).
 

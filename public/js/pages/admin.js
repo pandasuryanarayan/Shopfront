@@ -212,7 +212,7 @@ async function init() {
     const me = await api.me();
     store.setUser(me.user);
   } catch {
-    location.href = `/login.html?next=${encodeURIComponent('/admin.html')}`;
+    location.href = `/login.html?next=${encodeURIComponent('/mukhiya')}`;
     return;
   }
   if (store.user.role !== 'admin') {

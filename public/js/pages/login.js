@@ -77,7 +77,7 @@ async function submit(event) {
     const res = mode === 'login' ? await api.login(data) : await api.register(data);
     store.setUser(res.user);
     toast(`Welcome, ${res.user.name.split(' ')[0]}`, 'success');
-    location.href = res.user.role === 'admin' && next === '/' ? '/admin.html' : next;
+    location.href = res.user.role === 'admin' && next === '/' ? '/mukhiya' : next;
   } catch (err) {
     errorBox.textContent = err.message || 'Could not sign you in';
     errorBox.classList.remove('hide');

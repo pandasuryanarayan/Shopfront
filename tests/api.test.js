@@ -132,7 +132,7 @@ test('coupon validation applies discount', async () => {
 test('admin routes are protected from customers', async () => {
   const agent = request.agent(app);
   await agent.post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
-  const res = await agent.get('/api/admin/stats');
+  const res = await agent.get('/api/mukhiya/stats');
   assert.equal(res.status, 403);
 });
 
@@ -142,7 +142,7 @@ test('admin can read dashboard stats', async () => {
   assert.equal(login.status, 200);
   assert.equal(login.body.user.role, 'admin');
 
-  const stats = await agent.get('/api/admin/stats');
+  const stats = await agent.get('/api/mukhiya/stats');
   assert.equal(stats.status, 200);
   assert.ok(stats.body.kpis.orders >= 1);
   assert.ok(Array.isArray(stats.body.recentOrders));
