@@ -9,11 +9,31 @@ const panel = qs('#auth-panel');
 const next = new URLSearchParams(location.search).get('next') || '/';
 let mode = 'login';
 
-qs('#benefits').innerHTML = [
-  ['box', 'Track every order', 'Live status from packing to delivery.'],
-  ['spark', 'One-tap checkout', 'Saved addresses, no re-typing.'],
-  ['refresh', 'Easy returns', '7-day returns with free pickup.'],
-].map(([name, title, sub]) => `
+// The admin panel runs on its own port with its own session cookie. On that
+// surface there is no self-registration and the copy is operator-facing.
+const health = await fetch('/healthz').then((r) => r.json()).catch(() => ({ surface: 'store' }));
+const isAdminSurface = health.surface === 'admin';
+
+if (isAdminSurface) {
+  const heading = qs('.auth-wrap h1.display');
+  const blurb = qs('.auth-wrap .lead');
+  if (heading) heading.innerHTML = 'Store operations,<br>one place.';
+  if (blurb) blurb.textContent = 'Sign in with your administrator account to manage orders, stock and pricing. This panel has its own session — you can stay signed in here and as a customer in the shop at the same time.';
+}
+
+const BENEFITS = isAdminSurface
+  ? [
+      ['box', 'Orders in one queue', 'Move any order through packing to delivery.'],
+      ['spark', 'Live numbers', 'Revenue, AOV and conversion at a glance.'],
+      ['refresh', 'Catalogue control', 'Stock, pricing and archiving without a deploy.'],
+    ]
+  : [
+      ['box', 'Track every order', 'Live status from packing to delivery.'],
+      ['spark', 'One-tap checkout', 'Saved addresses, no re-typing.'],
+      ['refresh', 'Easy returns', '7-day returns with free pickup.'],
+    ];
+
+qs('#benefits').innerHTML = BENEFITS.map(([name, title, sub]) => `
   <div class="row" style="gap:12px">
     <div class="trust-icon">${icon(name, 18)}</div>
     <div><strong style="font-size:14px">${title}</strong><div class="tiny">${sub}</div></div>
@@ -21,13 +41,16 @@ qs('#benefits').innerHTML = [
 
 function render() {
   panel.innerHTML = `
+    ${isAdminSurface ? '' : `
     <div class="auth-tabs" role="tablist">
       <button type="button" role="tab" class="${mode === 'login' ? 'is-active' : ''}" data-mode="login">Sign in</button>
       <button type="button" role="tab" class="${mode === 'register' ? 'is-active' : ''}" data-mode="register">Create account</button>
-    </div>
+    </div>`}
     <div>
-      <h2 class="h2">${mode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
-      <p class="tiny">${mode === 'login' ? 'Sign in to see your cart and orders.' : 'It takes about 20 seconds.'}</p>
+      <h2 class="h2">${isAdminSurface ? 'Admin sign in' : mode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
+      <p class="tiny">${isAdminSurface
+        ? 'Administrator accounts only.'
+        : mode === 'login' ? 'Sign in to see your cart and orders.' : 'It takes about 20 seconds.'}</p>
     </div>
     <form class="stack" id="auth-form" novalidate>
       ${mode === 'register' ? `
@@ -50,15 +73,16 @@ function render() {
     </form>
     <div class="demo-note">
       <strong>Demo accounts</strong><br>
-      Customer: demo@shopfront.in / Demo@1234<br>
-      Admin: admin@shopfront.in / Admin@1234
+      ${isAdminSurface
+        ? 'Admin: admin@shopfront.in / Admin@1234'
+        : 'Customer: demo@shopfront.in / Demo@1234<br>Admin (separate panel): admin@shopfront.in / Admin@1234'}
     </div>`;
 
   qsa('[data-mode]').forEach((btn) => btn.addEventListener('click', () => { mode = btn.dataset.mode; render(); }));
   qs('#auth-form').addEventListener('submit', submit);
   if (mode === 'login') {
-    qs('#email').value = 'demo@shopfront.in';
-    qs('#password').value = 'Demo@1234';
+    qs('#email').value = isAdminSurface ? 'admin@shopfront.in' : 'demo@shopfront.in';
+    qs('#password').value = isAdminSurface ? 'Admin@1234' : 'Demo@1234';
   }
 }
 
@@ -77,7 +101,8 @@ async function submit(event) {
     const res = mode === 'login' ? await api.login(data) : await api.register(data);
     store.setUser(res.user);
     toast(`Welcome, ${res.user.name.split(' ')[0]}`, 'success');
-    location.href = res.user.role === 'admin' && next === '/' ? '/mukhiya' : next;
+    if (next !== '/') location.href = next;
+    else location.href = res.user.role === 'admin' ? '/mukhiya' : '/';
   } catch (err) {
     errorBox.textContent = err.message || 'Could not sign you in';
     errorBox.classList.remove('hide');

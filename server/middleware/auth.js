@@ -7,8 +7,12 @@ export function signToken(user) {
   return jwt.sign({ sub: user.id, role: user.role }, config.jwtSecret, { expiresIn: config.jwtTtl });
 }
 
-export function setAuthCookie(res, token) {
-  res.cookie(config.cookieName, token, {
+export function cookieNameFor(req) {
+  return req.app?.locals?.cookieName || config.cookieName;
+}
+
+export function setAuthCookie(res, token, cookieName = config.cookieName) {
+  res.cookie(cookieName, token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: config.cookieSecure,
@@ -17,8 +21,8 @@ export function setAuthCookie(res, token) {
   });
 }
 
-export function clearAuthCookie(res) {
-  res.clearCookie(config.cookieName, { path: '/' });
+export function clearAuthCookie(res, cookieName = config.cookieName) {
+  res.clearCookie(cookieName, { path: '/' });
 }
 
 function readToken(req) {
@@ -26,9 +30,10 @@ function readToken(req) {
   if (header && header.startsWith('Bearer ')) return header.slice(7).trim();
   const cookies = req.headers.cookie;
   if (!cookies) return null;
+  const name = cookieNameFor(req);
   for (const part of cookies.split(';')) {
     const [key, ...rest] = part.trim().split('=');
-    if (key === config.cookieName) return decodeURIComponent(rest.join('='));
+    if (key === name) return decodeURIComponent(rest.join('='));
   }
   return null;
 }

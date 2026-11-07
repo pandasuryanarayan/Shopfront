@@ -11,10 +11,25 @@ import cartRoutes from './routes/cart.js';
 import orderRoutes from './routes/orders.js';
 import adminRoutes from './routes/admin.js';
 
-export function createApp() {
+/**
+ * Builds an Express app for one of two surfaces:
+ *
+ *   'store' — the customer-facing shop (port 4000)
+ *   'admin' — the admin panel at /mukhiya (port 4001)
+ *
+ * The two surfaces run as separate origins *and* use separate session cookies,
+ * because cookies are scoped by host and ignore the port. Without distinct
+ * cookie names, signing in as an admin would evict the customer session in the
+ * same browser.
+ */
+export function createApp({ surface = 'store' } = {}) {
+  const isAdminSurface = surface === 'admin';
   const app = express();
+
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
+  app.locals.surface = surface;
+  app.locals.cookieName = isAdminSurface ? config.adminCookieName : config.cookieName;
 
   app.use(helmet({
     contentSecurityPolicy: {
@@ -44,27 +59,43 @@ export function createApp() {
     message: { error: { code: 'RATE_LIMITED', message: 'Too many attempts. Try again in a few minutes.' } },
   });
 
-  app.get('/healthz', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
+  app.get('/healthz', (_req, res) => res.json({ ok: true, surface, uptime: process.uptime() }));
 
   app.use('/api/auth', authLimiter, authRoutes);
-  app.use('/api', apiLimiter, catalogRoutes);
-  app.use('/api/cart', apiLimiter, cartRoutes);
-  app.use('/api/orders', apiLimiter, orderRoutes);
-  // Admin surface lives under /mukhiya (see the note in README) — both the UI
-  // route and the API mount moved here together.
-  app.use('/api/mukhiya', apiLimiter, adminRoutes);
 
-  // Admin panel. Registered before the static handler so the clean URL wins.
-  app.get('/mukhiya', (_req, res) => res.sendFile('admin.html', { root: config.publicDir }));
-  app.get('/admin.html', (_req, res) => res.redirect(301, '/mukhiya'));
+  if (isAdminSurface) {
+    // The admin panel gets only what it needs: admin APIs and its own login.
+    app.use('/api/mukhiya', apiLimiter, adminRoutes);
+  } else {
+    app.use('/api', apiLimiter, catalogRoutes);
+    app.use('/api/cart', apiLimiter, cartRoutes);
+    app.use('/api/orders', apiLimiter, orderRoutes);
+  }
 
-  app.use(express.static(config.publicDir, {
-    extensions: ['html'],
-    maxAge: config.isProd ? '7d' : 0,
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
-    },
-  }));
+  if (isAdminSurface) {
+    const page = (name) => (_req, res) => res.sendFile(name, { root: config.publicDir });
+    app.get(['/', '/mukhiya'], page('admin.html'));
+    app.get('/admin.html', (_req, res) => res.redirect(301, '/mukhiya'));
+    app.get('/login.html', page('login.html'));
+    app.get('/404.html', page('404.html'));
+
+    // Static assets only — no storefront pages on the admin origin.
+    const assetOpts = { maxAge: config.isProd ? '7d' : 0 };
+    app.use('/css', express.static(path.join(config.publicDir, 'css'), assetOpts));
+    app.use('/js', express.static(path.join(config.publicDir, 'js'), assetOpts));
+    app.use('/assets', express.static(path.join(config.publicDir, 'assets'), assetOpts));
+  } else {
+    // /mukhiya on the storefront points at the admin panel's own origin.
+    app.get(['/mukhiya', '/admin.html'], (_req, res) => res.redirect(302, config.adminPublicUrl));
+
+    app.use(express.static(config.publicDir, {
+      extensions: ['html'],
+      maxAge: config.isProd ? '7d' : 0,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+      },
+    }));
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

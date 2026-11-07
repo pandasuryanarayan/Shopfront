@@ -27,6 +27,13 @@ The UI follows a design system that lives in Figma — tokens, components and si
 - Order management with status transitions
 - Catalogue management with archive (soft delete)
 
+**Two independent surfaces**
+- The storefront and the admin panel are separate Express apps on separate ports
+- Separate session cookies (`sf_token` vs `sf_admin_token`) — cookies are scoped by host and
+  ignore the port, so distinct names are what actually keeps the two sessions apart
+- The admin surface only serves the admin panel, its assets and its own API; customer accounts
+  cannot sign in there, and `/mukhiya` on the storefront redirects to the admin origin
+
 **Engineering**
 - Strict server-side validation with Zod on every write endpoint
 - All money handled as integer paise — no floating point currency bugs
@@ -43,8 +50,15 @@ The UI follows a design system that lives in Figma — tokens, components and si
 npm install
 cp .env.example .env        # then set JWT_SECRET
 npm run seed                # optional: create the demo catalogue
-npm start                   # http://localhost:4000
+npm start
 ```
+
+`npm start` brings up **both surfaces from one process** (one database, two ports):
+
+| Surface    | URL                             | Session cookie  |
+| ---------- | ------------------------------- | --------------- |
+| Storefront | http://localhost:4000           | `sf_token`      |
+| Admin      | http://localhost:4001/mukhiya   | `sf_admin_token`|
 
 The server seeds itself automatically if the catalogue is empty, so `npm run seed` is optional.
 
@@ -55,7 +69,9 @@ The server seeds itself automatically if the catalogue is empty, so `npm run see
 | Customer | `demo@shopfront.in`  | `Demo@1234`  |
 | Admin    | `admin@shopfront.in` | `Admin@1234` |
 
-Admin dashboard: **`/mukhiya`** (`/admin.html` redirects there)
+Admin dashboard: **http://localhost:4001/mukhiya** — a separate origin with its own cookie, so you can be
+signed in as an admin there and as a customer in the shop at the same time. Set `ADMIN_PORT=0` to run the
+storefront only.
 
 ### Scripts
 
@@ -72,8 +88,8 @@ Admin dashboard: **`/mukhiya`** (`/admin.html` redirects there)
 
 ```
 server/
-  app.js              Express app: middleware, security headers, routes, static hosting
-  index.js            Bootstrap: database, auto-seed, graceful shutdown
+  app.js              Express app factory — `createApp({ surface: 'store' | 'admin' })`
+  index.js            Bootstrap: database, auto-seed, both listeners, graceful shutdown
   config.js           Environment configuration
   db/
     index.js          SQLite wrapper (sql.js) — query helpers, transactions, atomic flush
@@ -152,6 +168,8 @@ application depends only on the returned `{ ok, status, gatewayRef }` shape.
 ## Going to production
 
 1. Set `NODE_ENV=production` and a strong `JWT_SECRET` (the server refuses to boot without it).
+   Put the admin panel on an internal hostname or VPN — its port should not be publicly routable,
+   and set `ADMIN_PUBLIC_URL` so the storefront redirect points at the right place.
 2. Terminate TLS in front of the app — the auth cookie switches to `Secure` automatically.
 3. Point `DB_FILE` at a persistent volume, and back it up.
 4. Add real product imagery: replace the generated gradient artwork in `public/js/ui.js`

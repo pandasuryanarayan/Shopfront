@@ -5,12 +5,14 @@ import { openDatabase, getDb, resetDatabaseForTests } from '../server/db/index.j
 import { seed } from '../server/db/seed.js';
 import { createApp } from '../server/app.js';
 
-let app;
+let app;       // storefront surface (port 4000)
+let adminApp;  // admin surface (port 4001)
 
 before(async () => {
   await openDatabase({ inMemory: true });
   await seed({ silent: true });
-  app = createApp();
+  app = createApp({ surface: 'store' });
+  adminApp = createApp({ surface: 'admin' });
 });
 
 after(() => {
@@ -129,15 +131,19 @@ test('coupon validation applies discount', async () => {
   assert.equal(res.body.discountPaise, 50000);
 });
 
-test('admin routes are protected from customers', async () => {
-  const agent = request.agent(app);
-  await agent.post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
-  const res = await agent.get('/api/mukhiya/stats');
-  assert.equal(res.status, 403);
+test('a customer session is not accepted on the admin surface', async () => {
+  const storeLogin = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
+  const storeCookie = storeLogin.headers['set-cookie'][0].split(';')[0];
+
+  // The storefront cookie is a different name, so the admin app ignores it.
+  const res = await request(adminApp).get('/api/mukhiya/stats').set('Cookie', storeCookie);
+  assert.equal(res.status, 401);
 });
 
 test('admin can read dashboard stats', async () => {
-  const agent = request.agent(app);
+  const agent = request.agent(adminApp);
   const login = await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
   assert.equal(login.status, 200);
   assert.equal(login.body.user.role, 'admin');
@@ -146,6 +152,30 @@ test('admin can read dashboard stats', async () => {
   assert.equal(stats.status, 200);
   assert.ok(stats.body.kpis.orders >= 1);
   assert.ok(Array.isArray(stats.body.recentOrders));
+});
+
+test('admin API is not mounted on the storefront surface', async () => {
+  const agent = request.agent(app);
+  await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+  const res = await agent.get('/api/mukhiya/stats');
+  assert.equal(res.status, 404);
+});
+
+test('a customer cannot sign in on the admin surface', async () => {
+  const res = await request(adminApp)
+    .post('/api/auth/login')
+    .send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
+  assert.equal(res.status, 403);
+});
+
+test('store and admin sessions use different cookies', async () => {
+  const storeLogin = await request(app).post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
+  const adminLogin = await request(adminApp).post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+
+  const storeCookie = storeLogin.headers['set-cookie'][0].split(';')[0];
+  const adminCookie = adminLogin.headers['set-cookie'][0].split(';')[0];
+  assert.ok(storeCookie.startsWith('sf_token='), `expected sf_token, got ${storeCookie.split('=')[0]}`);
+  assert.ok(adminCookie.startsWith('sf_admin_token='), `expected sf_admin_token, got ${adminCookie.split('=')[0]}`);
 });
 
 test('login with wrong password is rejected', async () => {

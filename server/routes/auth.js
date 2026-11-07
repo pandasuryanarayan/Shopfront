@@ -6,7 +6,8 @@ import { parse } from '../lib/validate.js';
 import { conflict, unauthorized } from '../lib/errors.js';
 import { asyncHandler } from '../lib/errors.js';
 import { userDto } from '../lib/serialize.js';
-import { signToken, setAuthCookie, clearAuthCookie, requireAuth } from '../middleware/auth.js';
+import { signToken, setAuthCookie, clearAuthCookie, cookieNameFor, requireAuth } from '../middleware/auth.js';
+import { forbidden } from '../lib/errors.js';
 
 const router = Router();
 
@@ -22,6 +23,9 @@ const loginSchema = z.object({
 });
 
 router.post('/register', asyncHandler(async (req, res) => {
+  if (req.app.locals.surface === 'admin') {
+    throw forbidden('Accounts cannot be created on the admin panel');
+  }
   const { name, email, password } = parse(registerSchema, req.body);
   const db = getDb();
 
@@ -34,7 +38,7 @@ router.post('/register', asyncHandler(async (req, res) => {
   db.flush();
 
   const user = db.get('SELECT id, name, email, role FROM users WHERE id = ?', [lastInsertRowid]);
-  setAuthCookie(res, signToken(user));
+  setAuthCookie(res, signToken(user), cookieNameFor(req));
   res.status(201).json({ user: userDto(user) });
 }));
 
@@ -48,12 +52,17 @@ router.post('/login', asyncHandler(async (req, res) => {
   const ok = await bcrypt.compare(password, hash);
   if (!user || !ok) throw unauthorized('Email or password is incorrect');
 
-  setAuthCookie(res, signToken(user));
+  // The admin panel is a separate door: only administrators get a session there.
+  if (req.app.locals.surface === 'admin' && user.role !== 'admin') {
+    throw forbidden('This account does not have admin access');
+  }
+
+  setAuthCookie(res, signToken(user), cookieNameFor(req));
   res.json({ user: userDto(user) });
 }));
 
 router.post('/logout', (req, res) => {
-  clearAuthCookie(res);
+  clearAuthCookie(res, cookieNameFor(req));
   res.json({ ok: true });
 });
 

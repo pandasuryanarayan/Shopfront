@@ -15,15 +15,22 @@ export const config = {
   env,
   isProd: env === 'production',
   port: Number(process.env.PORT || 4000),
+  // The admin panel runs on its own port with its own session cookie, so an
+  // admin login and a customer login can coexist in the same browser.
+  // Set ADMIN_PORT=0 to serve the storefront only.
+  adminPort: Number(process.env.ADMIN_PORT ?? 4001),
   root,
   publicDir: path.join(root, 'public'),
   dbFile: process.env.DB_FILE || path.join(root, 'data', 'shopfront.db'),
   jwtSecret,
   jwtTtl: process.env.JWT_TTL || '7d',
   cookieName: 'sf_token',
+  adminCookieName: 'sf_admin_token',
   cookieSecure: env === 'production',
   currency: 'INR',
   freeDeliveryThresholdPaise: 49900,
   deliveryFeePaise: 4900,
   maxCartQty: 10,
 };
+
+config.adminPublicUrl = process.env.ADMIN_PUBLIC_URL || `http://localhost:${config.adminPort}`;
