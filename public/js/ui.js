@@ -157,7 +157,7 @@ export function mountChrome({ active = '' } = {}) {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="10" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>
           <span class="cart-count hide" id="cart-count">0</span>
         </a>
-        <a class="btn btn-primary btn-sm" href="/login.html" id="account-link">Sign in</a>
+        <div class="account-wrap" id="account-wrap"></div>
         <button class="icon-btn nav-toggle" type="button" aria-label="Menu" aria-expanded="false" id="nav-toggle">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
@@ -199,6 +199,88 @@ export function mountChrome({ active = '' } = {}) {
     location.href = `/products.html${q ? `?q=${encodeURIComponent(q)}` : ''}`;
   });
 
+  // ---- account menu (sign in / account / sign out) ----
+  let lastUserId = 'unset';
+
+  const closeMenu = () => {
+    const menu = qs('#account-menu');
+    const toggle = qs('#account-toggle');
+    if (menu && !menu.hidden) {
+      menu.hidden = true;
+      toggle?.setAttribute('aria-expanded', 'false');
+    }
+  };
+
+  const signOut = async (button) => {
+    button.disabled = true;
+    button.textContent = 'Signing out…';
+    try {
+      await api.logout();
+    } catch {
+      /* the cookie is cleared client-side either way */
+    }
+    store.setUser(null);
+    store.setCartCount(0);
+    store.setCoupon('');
+    toast('You have been signed out');
+    // Pages that require a session cannot stay open after signing out.
+    if (['/orders.html', '/checkout.html', '/cart.html'].includes(location.pathname)) {
+      location.href = '/';
+    } else {
+      location.reload();
+    }
+  };
+
+  const renderAccount = () => {
+    const wrap = qs('#account-wrap');
+    if (!wrap) return;
+
+    if (!store.user) {
+      wrap.innerHTML = '<a class="btn btn-primary btn-sm" href="/login.html">Sign in</a>';
+      return;
+    }
+
+    const initials = store.user.name
+      .split(' ')
+      .filter(Boolean)
+      .map((word) => word[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+
+    wrap.innerHTML = `
+      <button class="account-btn" type="button" id="account-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu">
+        <span class="avatar" aria-hidden="true">${esc(initials)}</span>
+        <span class="account-name">${esc(store.user.name.split(' ')[0])}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        <span class="sr-only">Account menu</span>
+      </button>
+      <div class="account-menu" id="account-menu" role="menu" hidden>
+        <div class="account-menu-head">
+          <strong>${esc(store.user.name)}</strong>
+          <span class="tiny">${esc(store.user.email)}</span>
+        </div>
+        <a class="account-menu-item" role="menuitem" href="/orders.html">Your orders</a>
+        ${store.user.role === 'admin' ? '<a class="account-menu-item" role="menuitem" href="/mukhiya">Admin panel</a>' : ''}
+        <button class="account-menu-item danger" role="menuitem" type="button" id="logout-btn">Sign out</button>
+      </div>`;
+
+    const toggle = qs('#account-toggle');
+    const menu = qs('#account-menu');
+
+    toggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const open = menu.hidden;
+      menu.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+    });
+
+    qs('#logout-btn').addEventListener('click', (event) => {
+      event.stopPropagation();
+      signOut(event.currentTarget);
+    });
+  };
+
   // header reacts to auth + cart state
   const render = () => {
     const count = qs('#cart-count');
@@ -206,17 +288,18 @@ export function mountChrome({ active = '' } = {}) {
       count.textContent = String(store.cartCount);
       count.classList.toggle('hide', store.cartCount === 0);
     }
-    const account = qs('#account-link');
-    if (account) {
-      if (store.user) {
-        account.textContent = store.user.name.split(' ')[0];
-        account.href = store.user.role === 'admin' ? '/mukhiya' : '/orders.html';
-      } else {
-        account.textContent = 'Sign in';
-        account.href = '/login.html';
-      }
+    const id = store.user ? store.user.id : null;
+    if (id !== lastUserId) {
+      lastUserId = id;
+      renderAccount();
     }
   };
+
+  document.addEventListener('click', closeMenu);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeMenu();
+  });
+
   store.subscribe(render);
   render();
 

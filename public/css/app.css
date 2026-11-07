@@ -167,6 +167,46 @@ h1, h2, h3, h4 { line-height: 1.25; letter-spacing: -0.02em; font-weight: 700; }
 }
 .nav-toggle { display: none; }
 
+/* ---------- account menu ---------- */
+.account-wrap { position: relative; }
+.account-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 40px; padding: 0 12px 0 4px; border-radius: var(--radius-pill);
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 14px; font-weight: 600; color: var(--ink-900);
+  transition: border-color 0.15s, background 0.15s;
+}
+.account-btn:hover { border-color: var(--border-strong); background: var(--surface-subtle); }
+.account-btn svg { color: var(--ink-500); }
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex: none;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #ffd9c7, #ffb59b);
+  color: #7a3c22; font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+}
+.account-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60;
+  min-width: 232px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-raised);
+  animation: menu-in 0.14s var(--ease);
+}
+@keyframes menu-in { from { opacity: 0; transform: translateY(-4px); } }
+.account-menu-head {
+  display: grid; gap: 2px; padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--border); margin-bottom: 6px;
+}
+.account-menu-head strong { font-size: 14px; }
+.account-menu-head .tiny { font-size: 12px; color: var(--ink-500); word-break: break-all; }
+.account-menu-item {
+  display: flex; align-items: center; width: 100%; gap: 8px;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500; color: var(--ink-700); text-align: left;
+}
+.account-menu-item:hover { background: var(--surface-subtle); color: var(--ink-900); }
+.account-menu-item.danger { color: var(--danger); }
+.account-menu-item.danger:hover { background: var(--danger-soft); color: var(--danger); }
+
 /* ---------- footer ---------- */
 .site-footer { background: var(--ink-900); color: var(--ink-300); margin-top: 64px; padding: 56px 0 28px; }
 .footer-grid { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 40px; }
@@ -249,6 +289,8 @@ h1, h2, h3, h4 { line-height: 1.25; letter-spacing: -0.02em; font-weight: 700; }
   .form-grid .span-2 { grid-column: span 1; }
   .footer-grid { grid-template-columns: 1fr; gap: 24px; }
   .nav-toggle { display: grid; }
+  .account-name { display: none; }
+  .account-btn { padding: 0 6px 0 4px; }
   .main-nav.is-open {
     display: grid; position: absolute; inset: 100% 0 auto 0;
     background: var(--surface); padding: 16px 24px; gap: 14px;
