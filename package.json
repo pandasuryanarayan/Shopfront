@@ -5,7 +5,9 @@
   "description": "Shopfront — a production-grade e-commerce web application (Node.js, Express, SQLite, vanilla HTML/CSS/JS)",
   "type": "module",
   "main": "server/index.js",
-  "engines": { "node": ">=18.17" },
+  "engines": {
+    "node": ">=18.17"
+  },
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
@@ -18,6 +20,7 @@
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.5.0",
     "sql.js": "^1.11.0",
     "zod": "^3.23.8"
   },

@@ -50,6 +50,7 @@ export const api = {
   categories: () => request('/categories'),
   products: (params) => request(`/products${qs(params)}`),
   product: (slug) => request(`/products/${encodeURIComponent(slug)}`),
+  searchSuggestions: (q) => request(`/search/suggestions${qs({ q })}`),
   addReview: (slug, body) => request(`/products/${encodeURIComponent(slug)}/reviews`, { method: 'POST', body }),
 
   // cart
@@ -59,11 +60,24 @@ export const api = {
   removeCartItem: (id) => request(`/cart/${id}`, { method: 'DELETE' }),
   applyCoupon: (body) => request('/cart/coupon', { method: 'POST', body }),
 
+  // wishlist
+  wishlist: () => request('/wishlist'),
+  wishlistIds: () => request('/wishlist/ids'),
+  addToWishlist: (productId) => request('/wishlist', { method: 'POST', body: { productId } }),
+  removeFromWishlist: (productId) => request(`/wishlist/${productId}`, { method: 'DELETE' }),
+
+  // addresses
+  addresses: () => request('/addresses'),
+  createAddress: (body) => request('/addresses', { method: 'POST', body }),
+  updateAddress: (id, body) => request(`/addresses/${id}`, { method: 'PATCH', body }),
+  deleteAddress: (id) => request(`/addresses/${id}`, { method: 'DELETE' }),
+
   // orders
   createOrder: (body) => request('/orders', { method: 'POST', body }),
   orders: () => request('/orders'),
   order: (reference) => request(`/orders/${encodeURIComponent(reference)}`),
   cancelOrder: (reference) => request(`/orders/${encodeURIComponent(reference)}/cancel`, { method: 'POST' }),
+  requestReturn: (reference, body) => request(`/orders/${encodeURIComponent(reference)}/returns`, { method: 'POST', body }),
 
   // admin (served under /mukhiya)
   adminStats: () => request('/mukhiya/stats'),

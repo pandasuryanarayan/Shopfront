@@ -118,9 +118,126 @@ test('checkout rejects an empty cart', async () => {
   assert.equal(res.status, 400);
 });
 
-test('cart endpoints require authentication', async () => {
+test('anonymous visitors get an empty cart rather than a 401', async () => {
   const res = await request(app).get('/api/cart');
-  assert.equal(res.status, 401);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.items, []);
+  assert.equal(res.body.summary.itemCount, 0);
+});
+
+test('a guest can add to cart and check out without an account', async () => {
+  const agent = request.agent(app);
+  const product = getDb().get("SELECT id FROM products WHERE slug = 'cotton-crew-tee'");
+
+  const add = await agent.post('/api/cart').send({ productId: product.id, size: 'M', colour: 'Ecru', qty: 1 });
+  assert.equal(add.status, 201);
+  assert.equal(add.body.items[0].colour, 'Ecru');
+
+  // guests are not "signed in"
+  const me = await agent.get('/api/auth/me');
+  assert.equal(me.body.user, null);
+  assert.equal(me.body.guest, true);
+
+  const noEmail = await agent.post('/api/orders').send({
+    address: { fullName: 'Guest Buyer', phone: '+919876543210', line1: '12 MG Road', city: 'Pune', state: 'Maharashtra', pincode: '411001' },
+    paymentMethod: 'cod',
+  });
+  assert.equal(noEmail.status, 400, 'guest checkout needs an email');
+
+  const ok = await agent.post('/api/orders').send({
+    address: { fullName: 'Guest Buyer', phone: '+919876543210', line1: '12 MG Road', city: 'Pune', state: 'Maharashtra', pincode: '411001' },
+    paymentMethod: 'cod',
+    guestEmail: 'guest@example.com',
+  });
+  assert.equal(ok.status, 201);
+  assert.equal(ok.body.order.guestEmail, 'guest@example.com');
+});
+
+test('wishlist add, list and remove', async () => {
+  const agent = request.agent(app);
+  await agent.post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
+  const product = getDb().get("SELECT id FROM products WHERE slug = 'trail-grip-runner'");
+
+  const add = await agent.post('/api/wishlist').send({ productId: product.id });
+  assert.equal(add.status, 201);
+  assert.equal(add.body.saved, true);
+
+  const list = await agent.get('/api/wishlist');
+  assert.ok(list.body.items.some((i) => i.slug === 'trail-grip-runner'));
+  assert.ok(list.body.items[0].image, 'wishlist items carry an image');
+
+  const remove = await agent.delete(`/api/wishlist/${product.id}`);
+  assert.equal(remove.body.saved, false);
+});
+
+test('saved addresses: create, default flag, list', async () => {
+  const agent = request.agent(app);
+  await agent.post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
+
+  const created = await agent.post('/api/addresses').send({
+    label: 'Parents', fullName: 'Ramesh Panda', phone: '+919812345678',
+    line1: '7 Park Street', city: 'Kolkata', state: 'West Bengal', pincode: '700016', isDefault: true,
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.address.isDefault, true);
+
+  const list = await agent.get('/api/addresses');
+  assert.equal(list.body.addresses.filter((a) => a.isDefault).length, 1, 'exactly one default');
+  assert.ok(list.body.addresses.some((a) => a.label === 'Parents'));
+});
+
+test('delivered orders can be returned, and only once', async () => {
+  const agent = request.agent(app);
+  await agent.post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
+  const db = getDb();
+  const product = db.get("SELECT id FROM products WHERE slug = 'cotton-throw-blanket'");
+
+  await agent.post('/api/cart').send({ productId: product.id, size: 'One size', qty: 1 });
+  const placed = await agent.post('/api/orders').send({
+    address: { fullName: 'Test Buyer', phone: '+919876543210', line1: '42, 3rd Cross', city: 'Bengaluru', state: 'Karnataka', pincode: '560038' },
+    paymentMethod: 'cod',
+  });
+  assert.equal(placed.status, 201);
+
+  const order = db.get('SELECT * FROM orders WHERE reference = ?', [placed.body.order.reference]);
+  db.run("UPDATE orders SET status = 'delivered' WHERE id = ?", [order.id]);
+  const item = db.all('SELECT * FROM order_items WHERE order_id = ?', [order.id])[0];
+
+  const res = await agent.post(`/api/orders/${order.reference}/returns`).send({ orderItemId: item.id, reason: 'size' });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.order.returns.length, 1);
+  assert.equal(res.body.order.returns[0].status, 'requested');
+
+  const again = await agent.post(`/api/orders/${order.reference}/returns`).send({ orderItemId: item.id, reason: 'size' });
+  assert.equal(again.status, 400, 'a second return for the same item is rejected');
+});
+
+test('the return window closes after seven days', async () => {
+  const agent = request.agent(app);
+  await agent.post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
+  const db = getDb();
+  const product = db.get("SELECT id FROM products WHERE slug = 'rose-face-mist'");
+
+  await agent.post('/api/cart').send({ productId: product.id, size: 'One size', qty: 1 });
+  const placed = await agent.post('/api/orders').send({
+    address: { fullName: 'Test Buyer', phone: '+919876543210', line1: '42, 3rd Cross', city: 'Bengaluru', state: 'Karnataka', pincode: '560038' },
+    paymentMethod: 'cod',
+  });
+
+  const order = db.get('SELECT * FROM orders WHERE reference = ?', [placed.body.order.reference]);
+  db.run("UPDATE orders SET status = 'delivered', created_at = datetime('now', '-20 days') WHERE id = ?", [order.id]);
+  const item = db.all('SELECT * FROM order_items WHERE order_id = ?', [order.id])[0];
+
+  const res = await agent.post(`/api/orders/${order.reference}/returns`).send({ orderItemId: item.id, reason: 'changed-mind' });
+  assert.equal(res.status, 400);
+});
+
+test('products expose images and colour variants', async () => {
+  const res = await request(app).get('/api/products/aero-runner-pro');
+  assert.ok(res.body.product.images.length >= 1);
+  assert.match(res.body.product.images[0].url, /^\/uploads\//);
+  assert.ok(res.body.product.colours.length >= 2);
+  assert.equal(res.body.product.colours[0].name, 'Black');
 });
 
 test('coupon validation applies discount', async () => {

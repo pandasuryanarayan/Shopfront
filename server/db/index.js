@@ -106,9 +106,26 @@ export async function openDatabase({ file = config.dbFile, inMemory = false } = 
   db.exec('PRAGMA foreign_keys = ON;');
   const schema = fs.readFileSync(path.join(config.root, 'server', 'db', 'schema.sql'), 'utf8');
   db.exec(schema);
+  migrate(db);
   db.flush();
   instance = db;
   return db;
+}
+
+/** Additive column migrations, so an existing database keeps working. */
+function migrate(db) {
+  const columns = {
+    users: { is_guest: 'INTEGER NOT NULL DEFAULT 0' },
+    orders: { guest_email: 'TEXT' },
+    cart_items: { colour: "TEXT NOT NULL DEFAULT 'Default'" },
+    order_items: { colour: "TEXT NOT NULL DEFAULT 'Default'" },
+  };
+  for (const [table, cols] of Object.entries(columns)) {
+    const existing = db.all(`PRAGMA table_info(${table})`).map((c) => c.name);
+    for (const [name, def] of Object.entries(cols)) {
+      if (!existing.includes(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${def}`);
+    }
+  }
 }
 
 export function getDb() {

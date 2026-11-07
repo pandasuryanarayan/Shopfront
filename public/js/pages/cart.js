@@ -55,7 +55,9 @@ function render(data) {
       <div>
         ${items.map((item) => `
           <div class="cart-row" data-id="${item.id}">
-            <a href="/product.html?slug=${encodeURIComponent(item.slug)}">${productArt({ ...item, gradient: item.gradient }, { className: 'art cart-thumb' })}</a>
+            <a href="/product.html?slug=${encodeURIComponent(item.slug)}">${item.image
+              ? `<img class="cart-thumb" src="${esc(item.image)}" alt="${esc(item.title)}" loading="lazy" style="object-fit:cover">`
+              : productArt({ ...item, gradient: item.gradient }, { className: 'art cart-thumb' })}</a>
             <div class="grow">
               <a class="product-title" href="/product.html?slug=${encodeURIComponent(item.slug)}">${esc(item.title)}</a>
               <div class="product-meta">${esc(item.size)}</div>

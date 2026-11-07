@@ -151,6 +151,21 @@ h1, h2, h3, h4 { line-height: 1.25; letter-spacing: -0.02em; font-weight: 700; }
 .header-search { position: relative; flex: 1; max-width: 380px; margin-left: auto; }
 .header-search .input { height: 44px; border-radius: var(--radius-pill); background: var(--surface-subtle); border-color: var(--border); padding-left: 40px; }
 .header-search .input:focus { background: var(--surface); }
+.search-suggestions {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 70;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-raised);
+  overflow: hidden; padding: 6px;
+}
+.search-suggestion {
+  display: block; padding: 10px 12px; border-radius: var(--radius-sm);
+  font-size: 14px; color: var(--ink-700);
+}
+.search-suggestion:hover { background: var(--surface-subtle); color: var(--ink-900); }
+.search-suggestion.see-all {
+  border-top: 1px solid var(--border); margin-top: 6px; padding-top: 12px;
+  color: var(--brand); font-weight: 600;
+}
 .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-300); pointer-events: none; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
 .icon-btn {
@@ -238,6 +253,8 @@ h1, h2, h3, h4 { line-height: 1.25; letter-spacing: -0.02em; font-weight: 700; }
 }
 .product-card:hover .wish-btn { opacity: 1; transform: none; }
 .wish-btn:hover { color: var(--danger); }
+.wish-btn.is-saved { color: var(--danger); opacity: 1; transform: none; }
+.wish-btn.is-saved:hover { color: var(--danger); }
 .product-body { padding: 14px 16px 18px; display: grid; gap: 6px; }
 .product-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
 .product-meta { font-size: 12px; color: var(--ink-500); }

@@ -6,7 +6,7 @@ import { parse } from '../lib/validate.js';
 import { conflict, unauthorized } from '../lib/errors.js';
 import { asyncHandler } from '../lib/errors.js';
 import { userDto } from '../lib/serialize.js';
-import { signToken, setAuthCookie, clearAuthCookie, cookieNameFor, requireAuth } from '../middleware/auth.js';
+import { signToken, setAuthCookie, clearAuthCookie, clearGuestCookie, cookieNameFor } from '../middleware/auth.js';
 import { forbidden } from '../lib/errors.js';
 
 const router = Router();
@@ -63,10 +63,12 @@ router.post('/login', asyncHandler(async (req, res) => {
 
 router.post('/logout', (req, res) => {
   clearAuthCookie(res, cookieNameFor(req));
+  clearGuestCookie(res);
   res.json({ ok: true });
 });
 
-router.get('/me', requireAuth, (req, res) => {
+router.get('/me', (req, res) => {
+  if (!req.user || req.isGuest) return res.json({ user: null, guest: Boolean(req.isGuest) });
   res.json({ user: userDto(req.user) });
 });
 

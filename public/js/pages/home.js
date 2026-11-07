@@ -63,7 +63,9 @@ async function load() {
   if (heroProduct) {
     qs('#hero-card').innerHTML = `
       <a href="/product.html?slug=${encodeURIComponent(heroProduct.slug)}">
-        ${productArt(heroProduct)}
+        ${heroProduct.image
+          ? `<img class="art" src="${esc(heroProduct.image)}" alt="${esc(heroProduct.title)}" style="object-fit:cover">`
+          : productArt(heroProduct)}
         <div class="hero-card-body">
           <strong style="font-size:15px">${esc(heroProduct.title)}</strong>
           <span class="muted" style="font-size:13px">${money(heroProduct.pricePaise)} · ★ ${heroProduct.rating.toFixed(1)}</span>
@@ -72,8 +74,32 @@ async function load() {
   }
 }
 
+/* ---------- personalised rail from recently viewed ---------- */
+async function renderForYou() {
+  let recent = [];
+  try {
+    recent = JSON.parse(localStorage.getItem('sf_recent') || '[]');
+  } catch {
+    return;
+  }
+  const categories = [...new Set(recent.map((p) => p.categorySlug).filter(Boolean))].slice(0, 2);
+  if (!categories.length) return;
+
+  const seen = new Set(recent.map((p) => p.slug));
+  const batches = await Promise.all(categories.map((c) => api.products({ category: c, limit: 8, sort: 'rating' })));
+  const picks = batches.flatMap((b) => b.items).filter((p) => !seen.has(p.slug)).slice(0, 4);
+  if (picks.length < 2) return;
+
+  qs('#for-you-title').textContent = 'Picked for you';
+  qs('#for-you-sub').textContent = `More from ${categories.map((c) => c.charAt(0).toUpperCase() + c.slice(1)).join(' and ')}.`;
+  qs('#for-you').innerHTML = picks.map(productCard).join('');
+  qs('#for-you-section').classList.remove('hide');
+}
+
 load().catch((err) => {
   console.error(err);
   qs('#trending').innerHTML = '<p class="muted">Could not load products right now.</p>';
   qs('#new-arrivals').innerHTML = '';
 });
+
+renderForYou().catch(() => {});

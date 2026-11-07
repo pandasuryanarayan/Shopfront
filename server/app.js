@@ -10,6 +10,8 @@ import catalogRoutes from './routes/catalog.js';
 import cartRoutes from './routes/cart.js';
 import orderRoutes from './routes/orders.js';
 import adminRoutes from './routes/admin.js';
+import wishlistRoutes from './routes/wishlist.js';
+import addressRoutes from './routes/addresses.js';
 
 /**
  * Builds an Express app for one of two surfaces:
@@ -81,6 +83,8 @@ export function createApp({ surface = 'store' } = {}) {
     app.use('/api', apiLimiter, catalogRoutes);
     app.use('/api/cart', apiLimiter, cartRoutes);
     app.use('/api/orders', apiLimiter, orderRoutes);
+    app.use('/api/wishlist', apiLimiter, wishlistRoutes);
+    app.use('/api/addresses', apiLimiter, addressRoutes);
   }
 
   if (isAdminSurface) {
@@ -95,6 +99,7 @@ export function createApp({ surface = 'store' } = {}) {
     app.use('/css', express.static(path.join(config.publicDir, 'css'), assetOpts));
     app.use('/js', express.static(path.join(config.publicDir, 'js'), assetOpts));
     app.use('/assets', express.static(path.join(config.publicDir, 'assets'), assetOpts));
+    app.use('/uploads', express.static(path.join(config.publicDir, 'uploads'), assetOpts));
   } else {
     // /mukhiya on the storefront points at the admin panel's own origin.
     app.get(['/mukhiya', '/admin.html'], (_req, res) => res.redirect(302, config.adminPublicUrl));

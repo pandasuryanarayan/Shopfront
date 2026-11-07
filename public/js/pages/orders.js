@@ -13,7 +13,7 @@ function orderCard(order) {
   return `
     <article class="order-card">
       <div class="order-head">
-        <div><strong>${esc(order.reference)}</strong> <span class="muted">· ${new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>
+        <div><a href="/order.html?ref=${encodeURIComponent(order.reference)}"><strong style="color:var(--brand)">${esc(order.reference)}</strong></a> <span class="muted">· ${new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>
         <div class="row" style="gap:10px">
           ${statusBadge(order.status)}
           ${statusBadge(order.paymentStatus)}
@@ -23,7 +23,7 @@ function orderCard(order) {
       <div class="order-body">
         ${order.items.map((i) => `
           <div class="order-item">
-            ${productArt({ id: i.productId, title: i.title, gradient: ['#EDEBFF', '#D6CDFF'] }, { className: 'art' })}
+            ${i.image ? `<img class="art" src="${esc(i.image)}" alt="${esc(i.title)}" style="object-fit:cover">` : productArt({ id: i.productId, title: i.title, gradient: ['#EDEBFF', '#D6CDFF'] }, { className: 'art' })}
             <div class="grow">
               <strong style="font-size:14px">${esc(i.title)}</strong>
               <div class="tiny">${esc(i.size)} · Qty ${i.qty}</div>
@@ -33,7 +33,10 @@ function orderCard(order) {
         <hr class="divider">
         <div class="row-between" style="font-size:13px">
           <span class="muted">Delivering to ${esc(order.address.fullName)}, ${esc(order.address.city)} ${esc(order.address.pincode)} · ${esc(order.paymentMethod.toUpperCase())}</span>
-          ${cancellable ? `<button class="btn btn-secondary btn-sm" type="button" data-cancel="${esc(order.reference)}">Cancel order</button>` : ''}
+          <div class="row" style="gap:10px">
+            <a class="btn btn-secondary btn-sm" href="/order.html?ref=${encodeURIComponent(order.reference)}">View details</a>
+            ${cancellable ? `<button class="btn btn-secondary btn-sm" type="button" data-cancel="${esc(order.reference)}">Cancel order</button>` : ''}
+          </div>
         </div>
       </div>
     </article>`;
@@ -89,13 +92,13 @@ async function load() {
       }
     }));
   } catch (err) {
-    if (err.status === 401) return; // handleError already redirected
+    if (err.status === 401) {
+      location.href = `/login.html?next=${encodeURIComponent('/orders.html')}`;
+      return;
+    }
     handleError(err);
   }
 }
 
-if (!currentUser) {
-  location.href = `/login.html?next=${encodeURIComponent('/orders.html')}`;
-} else {
-  load();
-}
+// Guests have a session cookie too, so try the list before bouncing to login.
+load();

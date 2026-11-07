@@ -4,6 +4,22 @@ import { getDb } from '../db/index.js';
 import { parse } from '../lib/validate.js';
 import { notFound, badRequest, asyncHandler } from '../lib/errors.js';
 import { productDto } from '../lib/serialize.js';
+
+/** Loads images + colour variants for a set of products in two queries. */
+function hydrate(db, rows) {
+  if (!rows.length) return rows.map((r) => productDto(r));
+  const ids = rows.map((r) => r.id);
+  const marks = ids.map(() => '?').join(',');
+  const images = db.all(`SELECT * FROM product_images WHERE product_id IN (${marks}) ORDER BY sort`, ids);
+  const variants = db.all(`SELECT * FROM product_variants WHERE product_id IN (${marks}) ORDER BY sort`, ids);
+  const byProduct = (list) => list.reduce((acc, item) => {
+    (acc[item.product_id] ||= []).push(item);
+    return acc;
+  }, {});
+  const imgMap = byProduct(images);
+  const varMap = byProduct(variants);
+  return rows.map((r) => productDto(r, [], imgMap[r.id] || [], varMap[r.id] || []));
+}
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -75,7 +91,7 @@ router.get('/products', (req, res) => {
   );
 
   res.json({
-    items: rows.map((r) => productDto(r)),
+    items: hydrate(db, rows),
     page,
     pageSize: limit,
     total,
@@ -94,6 +110,8 @@ router.get('/products/:slug', (req, res) => {
   if (!row) throw notFound('That product does not exist');
 
   const sizes = db.all('SELECT label, stock FROM product_sizes WHERE product_id = ? ORDER BY id', [row.id]);
+  const images = db.all('SELECT url, alt FROM product_images WHERE product_id = ? ORDER BY sort', [row.id]);
+  const variants = db.all('SELECT colour, colour_hex, stock FROM product_variants WHERE product_id = ? ORDER BY sort', [row.id]);
   const reviews = db.all(
     `SELECT r.id, r.rating, r.body, r.created_at, u.name AS author
        FROM reviews r JOIN users u ON u.id = r.user_id
@@ -109,9 +127,9 @@ router.get('/products/:slug', (req, res) => {
   );
 
   res.json({
-    product: productDto(row, sizes),
+    product: productDto(row, sizes, images, variants),
     reviews: reviews.map((r) => ({ id: r.id, rating: r.rating, body: r.body, author: r.author, createdAt: r.created_at })),
-    related: related.map((r) => productDto(r)),
+    related: hydrate(db, related),
   });
 });
 

@@ -8,6 +8,8 @@ const currentUser = await boot();
 const root = qs('#checkout-root');
 let cart = null;
 let paymentMethod = 'upi';
+let savedAddresses = [];
+let selectedAddressId = null;
 
 const FIELDS = [
   ['fullName', 'Full name', 'text', 'span-2', 'Suryanarayan Panda'],
@@ -33,8 +35,28 @@ function render() {
 
     <div class="checkout-layout">
       <div class="stack" style="gap:20px">
-        <form class="card stack" id="address-form" novalidate>
+        <div class="card stack" id="address-book">
           <div class="row-between"><h2 class="h4">Delivery address</h2><span class="tiny">Step 1 of 2</span></div>
+          ${savedAddresses.length ? `
+            <div class="stack" style="gap:10px" id="address-list">
+              ${savedAddresses.map((a) => `
+                <label class="address-option ${a.id === selectedAddressId ? 'is-selected' : ''}" data-address="${a.id}">
+                  <input type="radio" name="savedAddress" value="${a.id}" ${a.id === selectedAddressId ? 'checked' : ''}>
+                  <div class="grow">
+                    <strong>${esc(a.fullName)} ${a.isDefault ? '<span class="address-tag">Default</span>' : ''}</strong>
+                    <span class="tiny">${esc(a.line1)}${a.line2 ? `, ${esc(a.line2)}` : ''}, ${esc(a.city)}, ${esc(a.state)} ${esc(a.pincode)}</span>
+                    <span class="tiny">${esc(a.label)} · ${esc(a.phone)}</span>
+                  </div>
+                </label>`).join('')}
+              <label class="address-option ${selectedAddressId === null ? 'is-selected' : ''}" data-address="new">
+                <input type="radio" name="savedAddress" value="new" ${selectedAddressId === null ? 'checked' : ''}>
+                <div class="grow"><strong>Use a new address</strong><span class="tiny">Type it in below</span></div>
+              </label>
+            </div>` : ''}
+        </div>
+
+        <form class="card stack ${savedAddresses.length && selectedAddressId ? 'hide' : ''}" id="address-form" novalidate>
+          <div class="row-between"><h2 class="h4">${savedAddresses.length ? 'New address' : 'Where should we deliver?'}</h2></div>
           <div class="form-grid">
             ${FIELDS.map(([name, label, type, span, placeholder]) => `
               <div class="field ${span}">
@@ -43,6 +65,8 @@ function render() {
                 <span class="field-error" data-error="${name}"></span>
               </div>`).join('')}
           </div>
+          ${!savedAddresses.length && !cart.isGuest ? `
+          <label class="check"><input type="checkbox" id="save-address" checked> Save this address for next time</label>` : ''}
         </form>
 
         <div class="card stack">
@@ -69,7 +93,7 @@ function render() {
         <div class="stack" style="gap:12px">
           ${items.map((i) => `
             <div class="mini-item">
-              ${productArt({ ...i, gradient: i.gradient }, { className: 'art' })}
+              ${i.image ? `<img class="art" src="${esc(i.image)}" alt="${esc(i.title)}" style="object-fit:cover">` : productArt({ ...i, gradient: i.gradient }, { className: 'art' })}
               <div class="grow">
                 <strong style="font-size:14px">${esc(i.title)}</strong>
                 <div class="tiny">${esc(i.size)} · Qty ${i.qty}</div>
@@ -85,12 +109,26 @@ function render() {
           <hr class="divider">
           <div class="summary-line"><span class="summary-total">Total payable</span><span class="summary-total">${money(summary.totalPaise)}</span></div>
         </div>
+        ${cart.isGuest ? `
+        <div class="field">
+          <label for="guest-email">Email for your receipt</label>
+          <input class="input" id="guest-email" type="email" placeholder="you@example.com" required>
+          <span class="hint">You can check out as a guest — no account needed.</span>
+        </div>` : ''}
         <button class="btn btn-primary btn-lg btn-block" type="button" id="place-order">Place order · ${money(summary.totalPaise)}</button>
         <p class="tiny">By placing this order you agree to our Terms of Service and Refund Policy.</p>
       </div>
     </div>`;
 
   renderPayments();
+
+  qsa('[data-address]').forEach((label) => label.addEventListener('click', () => {
+    const value = label.dataset.address;
+    selectedAddressId = value === 'new' ? null : Number(value);
+    qsa('[data-address]').forEach((l) => l.classList.toggle('is-selected', l === label));
+    qs('#address-form').classList.toggle('hide', selectedAddressId !== null);
+  }));
+
   qs('#place-order').addEventListener('click', placeOrder);
 }
 
@@ -119,6 +157,10 @@ function renderPayments() {
 }
 
 function collectAddress() {
+  if (selectedAddressId) {
+    const a = savedAddresses.find((x) => x.id === selectedAddressId);
+    if (a) return { fullName: a.fullName, phone: a.phone, line1: a.line1, line2: a.line2 || '', city: a.city, state: a.state, pincode: a.pincode };
+  }
   const data = {};
   let ok = true;
   for (const [name] of FIELDS) {
@@ -157,10 +199,12 @@ async function placeOrder(event) {
   try {
     const body = { address, paymentMethod, couponCode: cart.coupon?.code };
     if (paymentMethod === 'upi') body.vpa = qs('#vpa')?.value.trim() || '';
+    if (cart.isGuest) body.guestEmail = qs('#guest-email')?.value.trim() || '';
+    if (qs('#save-address')?.checked) body.saveAddress = true;
     const { order } = await api.createOrder(body);
     store.setCoupon('');
     store.setCartCount(0);
-    location.href = `/orders.html?ref=${encodeURIComponent(order.reference)}`;
+    location.href = `/order.html?ref=${encodeURIComponent(order.reference)}`;
   } catch (err) {
     handleError(err);
     btn.disabled = false;
@@ -169,13 +213,17 @@ async function placeOrder(event) {
 }
 
 async function init() {
-  if (!currentUser) {
-    location.href = `/login.html?next=${encodeURIComponent('/checkout.html')}`;
-    return;
-  }
   try {
     cart = await api.cart(store.coupon || undefined);
     if (!cart.items.length) { location.href = '/cart.html'; return; }
+
+    // Guests check out too; they just have to give an email for the receipt.
+    cart.isGuest = !currentUser;
+    if (currentUser) {
+      const { addresses } = await api.addresses();
+      savedAddresses = addresses;
+      selectedAddressId = addresses.find((a) => a.isDefault)?.id ?? null;
+    }
     render();
   } catch (err) {
     handleError(err);

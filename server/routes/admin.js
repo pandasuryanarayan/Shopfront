@@ -6,6 +6,10 @@ import { notFound, badRequest } from '../lib/errors.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { productDto, orderDto, orderItemDto } from '../lib/serialize.js';
 import { config } from '../config.js';
+import multer from 'multer';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 
 const router = Router();
 router.use(requireAdmin);
@@ -101,6 +105,49 @@ function defaultSizes(slug, stock) {
 }
 
 const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+
+/* ---------- product images ---------- */
+const UPLOAD_DIR = path.join(config.root, config.uploadDir);
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+    filename: (_req, file, cb) => {
+      const ext = (path.extname(file.originalname) || '.jpg').toLowerCase().replace(/[^.a-z0-9]/g, '') || '.jpg';
+      cb(null, `${Date.now()}-${crypto.randomUUID().slice(0, 8)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 6 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => cb(null, /^image\/(jpeg|png|webp|gif|avif)$/.test(file.mimetype)),
+});
+
+router.post('/products/:id/images', upload.single('image'), (req, res) => {
+  const db = getDb();
+  const product = db.get('SELECT id, title FROM products WHERE id = ?', [Number(req.params.id)]);
+  if (!product) throw notFound('Product not found');
+  if (!req.file) throw badRequest('Attach an image file (JPEG, PNG, WebP or GIF)');
+
+  const url = `/uploads/${req.file.filename}`;
+  const sort = db.get('SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?', [product.id]).n;
+  db.run('INSERT INTO product_images (product_id, url, alt, sort) VALUES (?,?,?,?)',
+    [product.id, url, `${product.title} image ${sort + 1}`, sort]);
+  db.flush();
+  res.status(201).json({ image: { url, alt: `${product.title} image ${sort + 1}` } });
+});
+
+router.delete('/products/:id/images/:imageId', (req, res) => {
+  const db = getDb();
+  const row = db.get('SELECT * FROM product_images WHERE id = ? AND product_id = ?',
+    [Number(req.params.imageId), Number(req.params.id)]);
+  if (!row) throw notFound('Image not found');
+  db.run('DELETE FROM product_images WHERE id = ?', [row.id]);
+  db.flush();
+  if (row.url.startsWith('/uploads/') && !row.url.startsWith('/uploads/demo/')) {
+    fs.rm(path.join(UPLOAD_DIR, path.basename(row.url)), { force: true }, () => {});
+  }
+  res.json({ ok: true });
+});
 
 router.get('/categories', (_req, res) => {
   const db = getDb();

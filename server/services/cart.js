@@ -3,9 +3,10 @@ import { computeTotals } from './pricing.js';
 
 export function loadCartItems(db, userId) {
   return db.all(
-    `SELECT c.id, c.size, c.qty, p.id AS productId, p.slug, p.title, p.subtitle,
+    `SELECT c.id, c.size, c.colour, c.qty, p.id AS productId, p.slug, p.title, p.subtitle,
             p.price_paise AS pricePaise, p.mrp_paise AS mrpPaise, p.stock,
-            p.gradient_from AS gradientFrom, p.gradient_to AS gradientTo
+            p.gradient_from AS gradientFrom, p.gradient_to AS gradientTo,
+            (SELECT url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.sort LIMIT 1) AS image
        FROM cart_items c
        JOIN products p ON p.id = c.product_id
       WHERE c.user_id = ?
@@ -18,6 +19,7 @@ export function loadCartItems(db, userId) {
     title: row.title,
     subtitle: row.subtitle,
     size: row.size,
+    colour: row.colour || 'Default',
     qty: row.qty,
     stock: row.stock,
     pricePaise: row.pricePaise,
@@ -25,6 +27,7 @@ export function loadCartItems(db, userId) {
     lineTotalPaise: row.pricePaise * row.qty,
     discountPercent: percentOff(row.mrpPaise, row.pricePaise),
     gradient: [row.gradientFrom, row.gradientTo],
+    image: row.image || null,
   }));
 }
 

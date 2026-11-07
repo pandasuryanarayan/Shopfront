@@ -39,12 +39,16 @@ export function productArt(product, { className = 'art', label = false } = {}) {
 
 /* ---------- product card ---------- */
 export function productCard(p) {
+  const media = p.image
+    ? `<img src="${esc(p.image)}" alt="${esc(p.title)}" loading="lazy" decoding="async">`
+    : productArt(p);
   return `
     <article class="product-card">
       <a class="product-media" href="/product.html?slug=${encodeURIComponent(p.slug)}" aria-label="${esc(p.title)}">
-        ${productArt(p)}
+        ${media}
         ${p.badge ? `<span class="badge ${p.badge === 'New' ? 'badge-brand' : 'badge-accent'}">${esc(p.badge)}</span>` : ''}
-        <button class="wish-btn" type="button" aria-label="Save ${esc(p.title)}" data-wish="${esc(p.slug)}">♡</button>
+        <button class="wish-btn${isSaved(p.id) ? ' is-saved' : ''}" type="button" aria-label="Save ${esc(p.title)}"
+                aria-pressed="${isSaved(p.id)}" data-wish-id="${p.id}">${isSaved(p.id) ? '♥' : '♡'}</button>
       </a>
       <div class="product-body">
         <a class="product-title" href="/product.html?slug=${encodeURIComponent(p.slug)}">${esc(p.title)}</a>
@@ -68,6 +72,50 @@ export function skeletonCards(count = 4) {
         <div class="skeleton" style="height:16px;width:55%"></div>
       </div>
     </div>`).join('');
+}
+
+/* ---------- wishlist ---------- */
+const savedIds = new Set();
+export const isSaved = (id) => savedIds.has(Number(id));
+
+export function refreshHearts() {
+  document.querySelectorAll('.wish-btn[data-wish-id]').forEach((btn) => {
+    const on = isSaved(btn.dataset.wishId);
+    // Only touch nodes that are actually out of date: this runs from a
+    // MutationObserver, so writing unconditionally would re-trigger itself.
+    if (btn.classList.contains('is-saved') === on) return;
+    btn.classList.toggle('is-saved', on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.textContent = on ? '♥' : '♡';
+  });
+}
+
+export async function syncWishlist() {
+  try {
+    const { productIds } = await api.wishlistIds();
+    savedIds.clear();
+    productIds.forEach((id) => savedIds.add(Number(id)));
+  } catch {
+    savedIds.clear();
+  }
+  refreshHearts();
+  return savedIds.size;
+}
+
+export async function toggleWishlist(productId) {
+  const id = Number(productId);
+  if (savedIds.has(id)) {
+    await api.removeFromWishlist(id);
+    savedIds.delete(id);
+    toast('Removed from your wishlist');
+  } else {
+    await api.addToWishlist(id);
+    savedIds.add(id);
+    toast('Saved to your wishlist', 'success');
+  }
+  refreshHearts();
+  document.dispatchEvent(new CustomEvent('wishlist:change', { detail: savedIds.size }));
+  return savedIds.has(id);
 }
 
 /* ---------- feedback ---------- */
@@ -116,6 +164,7 @@ const ICONS = {
   spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>',
   bag: '<path d="M6 8h12l1 12H5L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  heart: '<path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.6-7 9-7 9Z"/>',
 };
 
 export function icon(name, size = 40) {
@@ -154,6 +203,10 @@ export function mountChrome({ active = '', storeUrl = '' } = {}) {
         <input class="input" type="search" name="q" placeholder="Search for products, brands and more" aria-label="Search products">
       </form>
       <div class="header-actions">
+        <a class="icon-btn" href="${shop('/wishlist.html')}" aria-label="Wishlist" title="Wishlist">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.6-7 9-7 9Z"/></svg>
+          <span class="cart-count hide" id="wish-count">0</span>
+        </a>
         <a class="icon-btn" href="${shop('/orders.html')}" aria-label="Your orders" title="Your orders">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M14 2v6h6"/></svg>
         </a>
@@ -196,6 +249,37 @@ export function mountChrome({ active = '', storeUrl = '' } = {}) {
     const open = nav.classList.toggle('is-open');
     e.currentTarget.setAttribute('aria-expanded', String(open));
   });
+
+  // ---- search suggestions ----
+  const searchInput = qs('#search-form input[name=q]');
+  const searchBox = qs('#search-form');
+  if (searchInput) {
+    const panel = document.createElement('div');
+    panel.className = 'search-suggestions';
+    panel.hidden = true;
+    searchBox.appendChild(panel);
+
+    const close = () => { panel.hidden = true; };
+    const run = debounce(async () => {
+      const q = searchInput.value.trim();
+      if (q.length < 2) return close();
+      try {
+        const { suggestions } = await api.searchSuggestions(q);
+        if (!suggestions.length) return close();
+        panel.innerHTML = suggestions.map((s) => `
+          <a class="search-suggestion" href="${shop(`/product.html?slug=${encodeURIComponent(s.slug)}`)}">${esc(s.title)}</a>`).join('')
+          + `<a class="search-suggestion see-all" href="${shop(`/products.html?q=${encodeURIComponent(q)}`)}">See all results for “${esc(q)}”</a>`;
+        panel.hidden = false;
+      } catch {
+        close();
+      }
+    }, 220);
+
+    searchInput.addEventListener('input', run);
+    searchInput.addEventListener('focus', () => { if (searchInput.value.trim().length >= 2) run(); });
+    searchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    document.addEventListener('click', (e) => { if (!searchBox.contains(e.target)) close(); });
+  }
 
   qs('#search-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -299,6 +383,39 @@ export function mountChrome({ active = '', storeUrl = '' } = {}) {
     }
   };
 
+  document.addEventListener('click', async (event) => {
+    const heart = event.target.closest('.wish-btn[data-wish-id]');
+    if (!heart) return;
+    event.preventDefault();
+    if (!store.user) {
+      location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+      return;
+    }
+    heart.disabled = true;
+    try {
+      await toggleWishlist(heart.dataset.wishId);
+    } catch (err) {
+      handleError(err);
+    } finally {
+      heart.disabled = false;
+    }
+  });
+
+  document.addEventListener('wishlist:change', (e) => {
+    const badge = qs('#wish-count');
+    if (!badge) return;
+    badge.textContent = String(e.detail);
+    badge.classList.toggle('hide', e.detail === 0);
+  });
+
+  // Cards are rendered after boot on most pages; keep hearts in sync.
+  let paintQueued = false;
+  new MutationObserver(() => {
+    if (paintQueued) return;
+    paintQueued = true;
+    requestAnimationFrame(() => { paintQueued = false; refreshHearts(); });
+  }).observe(document.body, { childList: true, subtree: true });
+
   document.addEventListener('click', closeMenu);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeMenu();
@@ -315,5 +432,12 @@ export async function boot() {
   const [me, cart] = await Promise.allSettled([api.me(), api.cart()]);
   store.setUser(me.status === 'fulfilled' ? me.value.user : null);
   store.setCartCount(cart.status === 'fulfilled' ? cart.value.summary.itemCount : 0);
+
+  if (store.user) {
+    const count = await syncWishlist();
+    document.dispatchEvent(new CustomEvent('wishlist:change', { detail: count }));
+  } else {
+    savedIds.clear();
+  }
   return store.user;
 }

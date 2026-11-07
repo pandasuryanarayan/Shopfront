@@ -1,6 +1,6 @@
 import { percentOff } from './money.js';
 
-export function productDto(row, sizes = []) {
+export function productDto(row, sizes = [], images = [], variants = []) {
   return {
     id: row.id,
     slug: row.slug,
@@ -18,6 +18,9 @@ export function productDto(row, sizes = []) {
     gradient: [row.gradient_from, row.gradient_to],
     badge: row.badge,
     sizes: sizes.map((s) => ({ label: s.label, stock: s.stock, inStock: s.stock > 0 })),
+    images: images.map((i) => ({ url: i.url, alt: i.alt })),
+    image: images[0]?.url || null,
+    colours: variants.map((v) => ({ name: v.colour, hex: v.colour_hex, stock: v.stock, inStock: v.stock > 0 })),
   };
 }
 
@@ -37,6 +40,7 @@ export function orderDto(row, items = []) {
     deliveryPaise: row.delivery_paise,
     totalPaise: row.total_paise,
     couponCode: row.coupon_code,
+    guestEmail: row.guest_email || null,
     address: JSON.parse(row.address_json),
     createdAt: row.created_at,
     items,

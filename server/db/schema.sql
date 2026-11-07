@@ -104,3 +104,67 @@ CREATE TABLE IF NOT EXISTS reviews (
   created_at TEXT    NOT NULL DEFAULT (datetime('now')),
   UNIQUE (product_id, user_id)
 );
+
+
+-- ---------------------------------------------------------------------------
+-- Feature tables: wishlist, saved addresses, product images, colour variants,
+-- return requests. Guest checkouts reuse the users table with is_guest = 1.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS wishlist (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (user_id, product_id)
+);
+
+CREATE TABLE IF NOT EXISTS addresses (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  label      TEXT    NOT NULL DEFAULT 'Home',
+  full_name  TEXT    NOT NULL,
+  phone      TEXT    NOT NULL,
+  line1      TEXT    NOT NULL,
+  line2      TEXT    NOT NULL DEFAULT '',
+  city       TEXT    NOT NULL,
+  state      TEXT    NOT NULL,
+  pincode    TEXT    NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_addresses_user ON addresses(user_id);
+
+CREATE TABLE IF NOT EXISTS product_images (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  url        TEXT    NOT NULL,
+  alt        TEXT    NOT NULL DEFAULT '',
+  sort       INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_images ON product_images(product_id);
+
+CREATE TABLE IF NOT EXISTS product_variants (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  colour     TEXT    NOT NULL,
+  colour_hex TEXT    NOT NULL DEFAULT '#12121A',
+  stock      INTEGER NOT NULL DEFAULT 0,
+  sort       INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (product_id, colour)
+);
+
+CREATE TABLE IF NOT EXISTS return_requests (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id      INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  order_item_id INTEGER NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason        TEXT    NOT NULL,
+  note          TEXT    NOT NULL DEFAULT '',
+  status        TEXT    NOT NULL DEFAULT 'requested'
+                CHECK (status IN ('requested','approved','rejected','picked_up','refunded')),
+  created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (order_item_id)
+);

@@ -26,6 +26,8 @@ export const config = {
   jwtTtl: process.env.JWT_TTL || '7d',
   cookieName: 'sf_token',
   adminCookieName: 'sf_admin_token',
+  guestCookieName: 'sf_guest',
+  uploadDir: 'public/uploads',
   cookieSecure: env === 'production',
   currency: 'INR',
   freeDeliveryThresholdPaise: 49900,
