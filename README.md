@@ -169,4 +169,4 @@ docker run -p 4000:4000 -e JWT_SECRET=change-me -v shopfront-data:/app/data shop
 
 ## Licence
 
-MIT — see `LICENSE`.
+GPL-3.0 — see [`LICENSE`](LICENSE).
