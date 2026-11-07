@@ -5,6 +5,7 @@ import { parse } from '../lib/validate.js';
 import { notFound, badRequest } from '../lib/errors.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { productDto, orderDto, orderItemDto } from '../lib/serialize.js';
+import { config } from '../config.js';
 
 const router = Router();
 router.use(requireAdmin);
@@ -54,19 +55,61 @@ router.get('/stats', (_req, res) => {
   });
 });
 
+const hexColour = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour like #EDEBFF');
+
 const productSchema = z.object({
   title: z.string().trim().min(3).max(120),
   subtitle: z.string().trim().max(120).optional().default(''),
   description: z.string().trim().max(2000).optional().default(''),
   categoryId: z.coerce.number().int().positive(),
-  pricePaise: z.coerce.number().int().min(0),
-  mrpPaise: z.coerce.number().int().min(0),
+  pricePaise: z.coerce.number().int().min(1),
+  mrpPaise: z.coerce.number().int().min(1),
   stock: z.coerce.number().int().min(0),
   badge: z.string().trim().max(24).optional().nullable(),
   isActive: z.coerce.boolean().optional(),
+  gradientFrom: hexColour.optional(),
+  gradientTo: hexColour.optional(),
+  sizes: z.array(z.object({
+    label: z.string().trim().min(1).max(20),
+    stock: z.coerce.number().int().min(0),
+  })).max(12).optional(),
 });
 
+const PALETTE = [
+  ['#EDEBFF', '#D6CDFF'],
+  ['#FFF1E8', '#FFD8C2'],
+  ['#E8F5EF', '#C6E8D8'],
+  ['#EAF0FF', '#CFDDFF'],
+  ['#FDECF3', '#F8CEDF'],
+  ['#EEF1F5', '#D8DFE8'],
+];
+
+const SIZES_BY_CATEGORY = {
+  footwear: ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'],
+  apparel: ['S', 'M', 'L', 'XL'],
+};
+
+/** Sizes an admin does not spell out are derived from the category. */
+function defaultSizes(slug, stock) {
+  const labels = SIZES_BY_CATEGORY[slug];
+  if (!labels) return [{ label: 'One size', stock }];
+  const each = Math.max(0, Math.floor(stock / labels.length));
+  return labels.map((label, i) => ({
+    label,
+    stock: i === labels.length - 1 ? Math.max(0, stock - each * (labels.length - 1)) : each,
+  }));
+}
+
 const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+
+router.get('/categories', (_req, res) => {
+  const db = getDb();
+  res.json({ categories: db.all('SELECT id, name, slug FROM categories ORDER BY sort') });
+});
+
+router.get('/config', (_req, res) => {
+  res.json({ storeUrl: config.storePublicUrl });
+});
 
 router.get('/products', (req, res) => {
   const db = getDb();
@@ -84,20 +127,39 @@ router.get('/products', (req, res) => {
 router.post('/products', (req, res) => {
   const data = parse(productSchema, req.body);
   const db = getDb();
-  if (!db.get('SELECT id FROM categories WHERE id = ?', [data.categoryId])) throw badRequest('Unknown category');
 
-  let slug = slugify(data.title);
+  const category = db.get('SELECT * FROM categories WHERE id = ?', [data.categoryId]);
+  if (!category) throw badRequest('Unknown category');
+  if (data.mrpPaise < data.pricePaise) {
+    throw badRequest('MRP cannot be lower than the selling price');
+  }
+
+  let slug = slugify(data.title) || 'product';
   let n = 1;
-  while (db.get('SELECT id FROM products WHERE slug = ?', [slug])) slug = `${slugify(data.title)}-${++n}`;
+  while (db.get('SELECT id FROM products WHERE slug = ?', [slug])) slug = `${slugify(data.title) || 'product'}-${++n}`;
 
-  const { lastInsertRowid } = db.run(
-    `INSERT INTO products (slug, title, subtitle, description, category_id, price_paise, mrp_paise, stock, badge)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
-    [slug, data.title, data.subtitle, data.description, data.categoryId, data.pricePaise, data.mrpPaise, data.stock, data.badge ?? null]
+  const palette = PALETTE[db.get('SELECT COUNT(*) AS n FROM products').n % PALETTE.length];
+  const sizes = data.sizes?.length ? data.sizes : defaultSizes(category.slug, data.stock);
+
+  const id = db.transaction(() => {
+    const { lastInsertRowid } = db.run(
+      `INSERT INTO products (slug, title, subtitle, description, category_id, price_paise, mrp_paise, stock, badge, gradient_from, gradient_to)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [slug, data.title, data.subtitle, data.description, data.categoryId, data.pricePaise, data.mrpPaise, data.stock,
+        data.badge ?? null, data.gradientFrom ?? palette[0], data.gradientTo ?? palette[1]]
+    );
+    for (const size of sizes) {
+      db.run('INSERT INTO product_sizes (product_id, label, stock) VALUES (?,?,?)', [lastInsertRowid, size.label, size.stock]);
+    }
+    return lastInsertRowid;
+  });
+
+  const row = db.get(
+    `SELECT p.*, c.name AS category_name, c.slug AS category_slug
+       FROM products p JOIN categories c ON c.id = p.category_id WHERE p.id = ?`,
+    [id]
   );
-  db.run('INSERT INTO product_sizes (product_id, label, stock) VALUES (?,?,?)', [lastInsertRowid, 'One size', data.stock]);
-  db.flush();
-  res.status(201).json({ id: lastInsertRowid, slug });
+  res.status(201).json({ product: productDto(row, sizes) });
 });
 
 router.patch('/products/:id', (req, res) => {

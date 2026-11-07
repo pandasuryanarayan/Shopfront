@@ -67,6 +67,8 @@ export const api = {
 
   // admin (served under /mukhiya)
   adminStats: () => request('/mukhiya/stats'),
+  adminConfig: () => request('/mukhiya/config'),
+  adminCategories: () => request('/mukhiya/categories'),
   adminProducts: (q) => request(`/mukhiya/products${qs({ q })}`),
   adminCreateProduct: (body) => request('/mukhiya/products', { method: 'POST', body }),
   adminUpdateProduct: (id, body) => request(`/mukhiya/products/${id}`, { method: 'PATCH', body }),

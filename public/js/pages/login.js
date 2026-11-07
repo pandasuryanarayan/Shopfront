@@ -2,17 +2,17 @@ import { api } from '../api.js';
 import { mountChrome, boot, qs, qsa, toast, icon } from '../ui.js';
 import { store } from '../store.js';
 
-mountChrome();
+// Resolve the surface first: the header must know whether its shop links stay
+// on this origin or cross to the storefront.
+const health = await fetch('/healthz').then((r) => r.json()).catch(() => ({ surface: 'store' }));
+const isAdminSurface = health.surface === 'admin';
+
+mountChrome({ storeUrl: isAdminSurface ? health.storeUrl || '' : '' });
 boot();
 
 const panel = qs('#auth-panel');
 const next = new URLSearchParams(location.search).get('next') || '/';
 let mode = 'login';
-
-// The admin panel runs on its own port with its own session cookie. On that
-// surface there is no self-registration and the copy is operator-facing.
-const health = await fetch('/healthz').then((r) => r.json()).catch(() => ({ surface: 'store' }));
-const isAdminSurface = health.surface === 'admin';
 
 if (isAdminSurface) {
   const heading = qs('.auth-wrap h1.display');

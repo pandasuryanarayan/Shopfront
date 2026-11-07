@@ -178,6 +178,60 @@ test('store and admin sessions use different cookies', async () => {
   assert.ok(adminCookie.startsWith('sf_admin_token='), `expected sf_admin_token, got ${adminCookie.split('=')[0]}`);
 });
 
+test('a product created in the admin panel appears in the storefront', async () => {
+  const agent = request.agent(adminApp);
+  await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+
+  const created = await agent.post('/api/mukhiya/products').send({
+    title: 'Alpine Fleece Jacket',
+    subtitle: 'Apparel · Unisex',
+    description: 'A warm mid-layer for cold mornings.',
+    categoryId: 2,
+    pricePaise: 249900,
+    mrpPaise: 349900,
+    stock: 32,
+    badge: 'New',
+  });
+
+  assert.equal(created.status, 201);
+  assert.equal(created.body.product.title, 'Alpine Fleece Jacket');
+  assert.equal(created.body.product.slug, 'alpine-fleece-jacket');
+  // Apparel sizes are inferred when the admin does not spell them out.
+  assert.deepEqual(created.body.product.sizes.map((s) => s.label), ['S', 'M', 'L', 'XL']);
+
+  const listed = await request(app).get('/api/products?q=Alpine');
+  assert.equal(listed.status, 200);
+  assert.equal(listed.body.items.length, 1);
+  assert.equal(listed.body.items[0].slug, 'alpine-fleece-jacket');
+  assert.equal(listed.body.items[0].discountPercent, 29);
+
+  const detail = await request(app).get('/api/products/alpine-fleece-jacket');
+  assert.equal(detail.status, 200);
+  assert.equal(detail.body.product.stock, 32);
+});
+
+test('admin cannot create a product priced above its MRP', async () => {
+  const agent = request.agent(adminApp);
+  await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+  const res = await agent.post('/api/mukhiya/products').send({
+    title: 'Impossible Deal',
+    categoryId: 1,
+    pricePaise: 99900,
+    mrpPaise: 49900,
+    stock: 5,
+  });
+  assert.equal(res.status, 400);
+});
+
+test('only admins can create products', async () => {
+  const storeAgent = request.agent(app);
+  await storeAgent.post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
+  const res = await storeAgent.post('/api/mukhiya/products').send({
+    title: 'Nope', categoryId: 1, pricePaise: 100, mrpPaise: 200, stock: 1,
+  });
+  assert.equal(res.status, 404); // admin API is not mounted on the storefront
+});
+
 test('login with wrong password is rejected', async () => {
   const res = await request(app).post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'wrong-password' });
   assert.equal(res.status, 401);

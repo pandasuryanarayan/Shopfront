@@ -132,7 +132,11 @@ const NAV = [
   ['Deals', '/products.html?sort=price_asc'],
 ];
 
-export function mountChrome({ active = '' } = {}) {
+export function mountChrome({ active = '', storeUrl = '' } = {}) {
+  // When the admin panel mounts this header, shop links must cross to the
+  // storefront origin instead of pointing at pages that do not exist there.
+  const base = String(storeUrl || '').replace(/\/+$/, '');
+  const shop = (path) => `${base}${path}`;
   const announce = document.createElement('div');
   announce.className = 'announce';
   announce.textContent = 'Free delivery on orders over ₹499  ·  7-day easy returns  ·  UPI, cards & COD accepted';
@@ -141,19 +145,19 @@ export function mountChrome({ active = '' } = {}) {
   header.className = 'site-header';
   header.innerHTML = `
     <div class="container header-inner">
-      <a class="brand" href="/"><span class="brand-mark">S</span>Shopfront</a>
+      <a class="brand" href="${shop('/')}"><span class="brand-mark">S</span>Shopfront</a>
       <nav class="main-nav" id="main-nav" aria-label="Primary">
-        ${NAV.map(([label, href]) => `<a href="${href}"${label === active ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
+        ${NAV.map(([label, link]) => `<a href="${shop(link)}"${label === active ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
       </nav>
       <form class="header-search" role="search" id="search-form">
         <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input class="input" type="search" name="q" placeholder="Search for products, brands and more" aria-label="Search products">
       </form>
       <div class="header-actions">
-        <a class="icon-btn" href="/orders.html" aria-label="Your orders" title="Your orders">
+        <a class="icon-btn" href="${shop('/orders.html')}" aria-label="Your orders" title="Your orders">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M14 2v6h6"/></svg>
         </a>
-        <a class="icon-btn" href="/cart.html" aria-label="Cart" title="Cart">
+        <a class="icon-btn" href="${shop('/cart.html')}" aria-label="Cart" title="Cart">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="10" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>
           <span class="cart-count hide" id="cart-count">0</span>
         </a>
@@ -170,12 +174,12 @@ export function mountChrome({ active = '' } = {}) {
     <div class="container">
       <div class="footer-grid">
         <div>
-          <a class="brand" href="/" style="color:#fff"><span class="brand-mark">S</span>Shopfront</a>
+          <a class="brand" href="${shop('/')}" style="color:#fff"><span class="brand-mark">S</span>Shopfront</a>
           <p style="margin-top:12px;max-width:34ch;font-size:14px">Thoughtfully made goods, delivered across India. Free delivery over ₹499 and 7-day returns on everything.</p>
         </div>
-        <div><h4>Shop</h4><a href="/products.html?sort=newest">New arrivals</a><a href="/products.html?category=footwear">Footwear</a><a href="/products.html?category=apparel">Apparel</a><a href="/products.html?category=home">Home</a></div>
-        <div><h4>Help</h4><a href="/orders.html">Track order</a><a href="/orders.html">Returns</a><a href="/cart.html">Cart</a><a href="/login.html">Your account</a></div>
-        <div><h4>Company</h4><a href="/">About</a><a href="/">Careers</a><a href="/">Privacy</a><a href="/">Terms</a></div>
+        <div><h4>Shop</h4><a href="${shop('/products.html?sort=newest')}">New arrivals</a><a href="${shop('/products.html?category=footwear')}">Footwear</a><a href="${shop('/products.html?category=apparel')}">Apparel</a><a href="${shop('/products.html?category=home')}">Home</a></div>
+        <div><h4>Help</h4><a href="${shop('/orders.html')}">Track order</a><a href="${shop('/orders.html')}">Returns</a><a href="${shop('/cart.html')}">Cart</a><a href="/login.html">Your account</a></div>
+        <div><h4>Company</h4><a href="${shop('/')}">About</a><a href="${shop('/')}">Careers</a><a href="${shop('/')}">Privacy</a><a href="${shop('/')}">Terms</a></div>
       </div>
       <div class="footer-bottom">
         <span>© ${new Date().getFullYear()} Shopfront Retail Pvt Ltd · Bengaluru, India</span>
@@ -196,7 +200,7 @@ export function mountChrome({ active = '' } = {}) {
   qs('#search-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const q = new FormData(e.currentTarget).get('q').toString().trim();
-    location.href = `/products.html${q ? `?q=${encodeURIComponent(q)}` : ''}`;
+    location.href = shop(`/products.html${q ? `?q=${encodeURIComponent(q)}` : ''}`);
   });
 
   // ---- account menu (sign in / account / sign out) ----
@@ -260,7 +264,7 @@ export function mountChrome({ active = '' } = {}) {
           <strong>${esc(store.user.name)}</strong>
           <span class="tiny">${esc(store.user.email)}</span>
         </div>
-        <a class="account-menu-item" role="menuitem" href="/orders.html">Your orders</a>
+        <a class="account-menu-item" role="menuitem" href="${shop('/orders.html')}">Your orders</a>
         ${store.user.role === 'admin' ? '<a class="account-menu-item" role="menuitem" href="/mukhiya">Admin panel</a>' : ''}
         <button class="account-menu-item danger" role="menuitem" type="button" id="logout-btn">Sign out</button>
       </div>`;

@@ -25,7 +25,9 @@ The UI follows a design system that lives in Figma — tokens, components and si
 - Revenue, orders, AOV and customer KPIs
 - Monthly revenue chart, top categories, low-stock alerts
 - Order management with status transitions
-- Catalogue management with archive (soft delete)
+- Catalogue management: add products from a form (sizes inferred from the category,
+  slug generated, card colour picked) — a new product is in the shop immediately
+- Archive (soft delete)
 
 **Two independent surfaces**
 - The storefront and the admin panel are separate Express apps on separate ports
@@ -143,6 +145,8 @@ a `Authorization: Bearer <token>` header also works for API clients.
 | GET    | `/api/orders/:reference`          | user   | Single order                       |
 | POST   | `/api/orders/:reference/cancel`   | user   | Cancel (restocks items)            |
 | GET    | `/api/mukhiya/stats`              | admin  | Dashboard aggregates               |
+| GET    | `/api/mukhiya/categories`         | admin  | Categories for the product form     |
+| GET    | `/api/mukhiya/config`             | admin  | Storefront URL for cross-links      |
 | GET    | `/api/mukhiya/products`           | admin  | Catalogue for admin                |
 | POST   | `/api/mukhiya/products`           | admin  | Create a product                   |
 | PATCH  | `/api/mukhiya/products/:id`       | admin  | Update a product                   |

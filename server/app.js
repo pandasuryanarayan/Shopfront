@@ -59,13 +59,24 @@ export function createApp({ surface = 'store' } = {}) {
     message: { error: { code: 'RATE_LIMITED', message: 'Too many attempts. Try again in a few minutes.' } },
   });
 
-  app.get('/healthz', (_req, res) => res.json({ ok: true, surface, uptime: process.uptime() }));
+  app.get('/healthz', (_req, res) =>
+    res.json({ ok: true, surface, uptime: process.uptime(), ...(isAdminSurface ? { storeUrl: config.storePublicUrl } : {}) })
+  );
 
   app.use('/api/auth', authLimiter, authRoutes);
 
   if (isAdminSurface) {
     // The admin panel gets only what it needs: admin APIs and its own login.
     app.use('/api/mukhiya', apiLimiter, adminRoutes);
+
+    // The shared header probes the cart on load; there is no cart on this origin.
+    app.get('/api/cart', (_req, res) =>
+      res.json({
+        items: [],
+        summary: { itemCount: 0, lineCount: 0, subtotalPaise: 0, discountPaise: 0, deliveryPaise: 0, totalPaise: 0 },
+        coupon: null,
+      })
+    );
   } else {
     app.use('/api', apiLimiter, catalogRoutes);
     app.use('/api/cart', apiLimiter, cartRoutes);

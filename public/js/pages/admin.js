@@ -7,6 +7,7 @@ await boot();
 const root = qs('#admin-root');
 let view = 'overview';
 let stats = null;
+let storeUrl = '';   // set from /api/mukhiya/config so links cross to the shop origin
 
 const monthLabel = (ym) => {
   const [y, m] = ym.split('-');
@@ -22,7 +23,7 @@ function shell(content) {
         ${[['overview', 'Overview'], ['orders', 'Orders'], ['products', 'Products']].map(([key, label]) => `
           <a href="#${key}" class="${view === key ? 'is-active' : ''}" data-view="${key}">${label}</a>`).join('')}
         <span class="label">System</span>
-        <a href="/" target="_blank" rel="noopener">View store ↗</a>
+        <a href="${esc(storeUrl || '/')}" target="_blank" rel="noopener">View store ↗</a>
         <a href="#" id="admin-logout">Sign out</a>
       </nav>
       <div style="margin-top:auto;padding:12px;border-radius:12px;background:rgba(255,255,255,.06)">
@@ -38,7 +39,7 @@ function shell(content) {
         </div>
         <div class="row" style="gap:10px">
           <span class="badge badge-brand">Last 30 days</span>
-          <a class="btn btn-secondary btn-sm" href="/">Open storefront</a>
+          <a class="btn btn-secondary btn-sm" href="${esc(storeUrl || '/')}" target="_blank" rel="noopener">Open storefront</a>
         </div>
       </header>
       <div class="admin-content">${content}</div>
@@ -161,10 +162,17 @@ async function ordersView() {
 }
 
 async function productsView() {
-  const { products } = await api.adminProducts();
+  const [{ products }, { categories }] = await Promise.all([api.adminProducts(), api.adminCategories()]);
+  addProduct.categories = categories;
   return `
     <div class="card stack">
-      <div class="row-between"><h2 class="h4">Catalogue</h2><span class="tiny">${products.length} products</span></div>
+      <div class="row-between">
+        <div>
+          <h2 class="h4">Catalogue</h2>
+          <p class="tiny">${products.length} products · changes appear in the shop immediately</p>
+        </div>
+        <button class="btn btn-primary btn-sm" type="button" data-add-product>+ Add product</button>
+      </div>
       <div class="table-wrap">
         <table class="table">
           <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Rating</th><th></th></tr></thead>
@@ -176,7 +184,12 @@ async function productsView() {
                 <td>${money(p.pricePaise)}</td>
                 <td><span class="badge ${p.stock > 15 ? 'badge-success' : p.stock > 0 ? 'badge-warning' : 'badge-danger'}">${p.stock}</span></td>
                 <td>★ ${p.rating.toFixed(1)} <span class="tiny">(${p.ratingCount})</span></td>
-                <td>${p.isActive ? `<button class="btn btn-secondary btn-sm" data-archive="${p.id}">Archive</button>` : '<span class="badge badge-danger">Archived</span>'}</td>
+                <td>
+                  <div class="row" style="gap:8px;justify-content:flex-end">
+                    <a class="btn btn-secondary btn-sm" href="${esc(storeUrl)}/product.html?slug=${encodeURIComponent(p.slug)}" target="_blank" rel="noopener">View</a>
+                    ${p.isActive ? `<button class="btn btn-secondary btn-sm" data-archive="${p.id}">Archive</button>` : '<span class="badge badge-danger">Archived</span>'}
+                  </div>
+                </td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -197,6 +210,8 @@ async function render() {
     } catch (err) { handleError(err); }
   }));
 
+  qsa('[data-add-product]').forEach((btn) => btn.addEventListener('click', () => openProductModal()));
+
   qsa('[data-archive]').forEach((btn) => btn.addEventListener('click', async () => {
     if (!confirm('Archive this product? It will disappear from the storefront.')) return;
     try {
@@ -205,6 +220,164 @@ async function render() {
       render();
     } catch (err) { handleError(err); }
   }));
+}
+
+/* ---------- add product ---------- */
+const addProduct = { categories: [] };
+
+const PALETTE = [
+  ['#EDEBFF', '#D6CDFF'],
+  ['#FFF1E8', '#FFD8C2'],
+  ['#E8F5EF', '#C6E8D8'],
+  ['#EAF0FF', '#CFDDFF'],
+  ['#FDECF3', '#F8CEDF'],
+  ['#EEF1F5', '#D8DFE8'],
+];
+
+function openProductModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <div>
+          <h2 class="h3" id="modal-title">Add a product</h2>
+          <p class="tiny">It goes live in the shop as soon as you save.</p>
+        </div>
+        <button class="icon-btn" type="button" data-close aria-label="Close">✕</button>
+      </div>
+      <form class="stack" id="product-form" novalidate>
+        <div class="field">
+          <label for="p-title">Product name</label>
+          <input class="input" id="p-title" name="title" placeholder="Alpine Fleece Jacket" required>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="p-subtitle">Short label</label>
+            <input class="input" id="p-subtitle" name="subtitle" placeholder="Apparel · Unisex">
+          </div>
+          <div class="field">
+            <label for="p-category">Category</label>
+            <select class="select" id="p-category" name="categoryId" required>
+              ${addProduct.categories.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label for="p-price">Selling price (₹)</label>
+            <input class="input" id="p-price" name="price" type="number" min="1" step="1" placeholder="2499" required>
+          </div>
+          <div class="field">
+            <label for="p-mrp">MRP (₹)</label>
+            <input class="input" id="p-mrp" name="mrp" type="number" min="1" step="1" placeholder="3499" required>
+          </div>
+          <div class="field">
+            <label for="p-stock">Stock</label>
+            <input class="input" id="p-stock" name="stock" type="number" min="0" step="1" placeholder="25" required>
+          </div>
+          <div class="field">
+            <label for="p-badge">Badge</label>
+            <select class="select" id="p-badge" name="badge">
+              <option value="">None</option>
+              <option value="New">New</option>
+              <option value="Bestseller">Bestseller</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="p-description">Description</label>
+          <textarea class="textarea" id="p-description" name="description" placeholder="What makes it worth buying?"></textarea>
+        </div>
+        <div class="field">
+          <label>Card colour</label>
+          <div class="swatches" id="p-swatches">
+            ${PALETTE.map(([a, b], i) => `
+              <button class="swatch" type="button" data-swatch="${i}" aria-pressed="${i === 0}"
+                      style="background:linear-gradient(135deg,${a},${b})" aria-label="Colour ${i + 1}"></button>`).join('')}
+          </div>
+        </div>
+        <div class="alert alert-error hide" id="p-error"></div>
+        <div class="row" style="justify-content:flex-end;gap:10px">
+          <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+          <button class="btn btn-primary" type="submit" id="p-submit">Save product</button>
+        </div>
+      </form>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+
+  let swatch = 0;
+  const close = () => {
+    overlay.remove();
+    document.body.style.overflow = '';
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay || e.target.closest('[data-close]')) close();
+  });
+
+  qsa('[data-swatch]').forEach((el) => el.addEventListener('click', () => {
+    swatch = Number(el.dataset.swatch);
+    qsa('[data-swatch]').forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
+  }));
+
+  qs('#p-category').addEventListener('change', () => {
+    const cat = addProduct.categories.find((c) => String(c.id) === qs('#p-category').value);
+    if (cat && !qs('#p-subtitle').value) qs('#p-subtitle').value = `${cat.name} · Unisex`;
+  });
+
+  qs('#product-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorBox = qs('#p-error');
+    const submit = qs('#p-submit');
+    errorBox.classList.add('hide');
+
+    const form = new FormData(event.currentTarget);
+    const price = Number(form.get('price'));
+    const mrp = Number(form.get('mrp'));
+
+    if (mrp < price) {
+      errorBox.textContent = 'MRP cannot be lower than the selling price.';
+      errorBox.classList.remove('hide');
+      return;
+    }
+
+    submit.disabled = true;
+    submit.textContent = 'Saving…';
+
+    try {
+      const { product } = await api.adminCreateProduct({
+        title: form.get('title').trim(),
+        subtitle: form.get('subtitle').trim(),
+        description: form.get('description').trim(),
+        categoryId: Number(form.get('categoryId')),
+        pricePaise: Math.round(price * 100),
+        mrpPaise: Math.round(mrp * 100),
+        stock: Number(form.get('stock')),
+        badge: form.get('badge') || null,
+        gradientFrom: PALETTE[swatch][0],
+        gradientTo: PALETTE[swatch][1],
+      });
+      close();
+      toast(`${product.title} is live in the shop`, 'success');
+      stats = await api.adminStats();
+      view = 'products';
+      render();
+    } catch (err) {
+      errorBox.textContent = err.details?.length ? err.details.map((d) => d.message).join(' · ') : err.message;
+      errorBox.classList.remove('hide');
+      submit.disabled = false;
+      submit.textContent = 'Save product';
+    }
+  });
+
+  // Typing into a pre-filled number field silently appends digits; select it instead.
+  qsa('#product-form input[type=number]').forEach((el) => el.addEventListener('focus', () => el.select()));
+
+  setTimeout(() => qs('#p-title')?.focus(), 50);
 }
 
 async function init() {
@@ -224,7 +397,9 @@ async function init() {
     return;
   }
   try {
-    stats = await api.adminStats();
+    const [config, statsData] = await Promise.all([api.adminConfig(), api.adminStats()]);
+    storeUrl = config.storeUrl;
+    stats = statsData;
     render();
   } catch (err) {
     handleError(err);

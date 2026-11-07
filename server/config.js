@@ -34,3 +34,4 @@ export const config = {
 };
 
 config.adminPublicUrl = process.env.ADMIN_PUBLIC_URL || `http://localhost:${config.adminPort}`;
+config.storePublicUrl = process.env.STORE_PUBLIC_URL || `http://localhost:${config.port}`;
