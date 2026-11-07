@@ -106,6 +106,7 @@ function render() {
           <div class="summary-line"><span>Subtotal</span><strong>${money(summary.subtotalPaise)}</strong></div>
           ${summary.discountPaise ? `<div class="summary-line"><span>Discount ${coupon ? `(${esc(coupon.code)})` : ''}</span><strong style="color:var(--success)">− ${money(summary.discountPaise)}</strong></div>` : ''}
           <div class="summary-line"><span>Delivery</span><strong>${summary.deliveryPaise ? money(summary.deliveryPaise) : 'Free'}</strong></div>
+          <div class="summary-line"><span>Tax (GST)</span><strong>${money(summary.taxPaise || 0)}</strong></div>
           <hr class="divider">
           <div class="summary-line"><span class="summary-total">Total payable</span><span class="summary-total">${money(summary.totalPaise)}</span></div>
         </div>

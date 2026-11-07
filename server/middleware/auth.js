@@ -49,8 +49,8 @@ export function optionalAuth(req, _res, next) {
   try {
     const payload = jwt.verify(token, config.jwtSecret);
     const db = getDb();
-    const user = db.get('SELECT id, name, email, role, is_guest FROM users WHERE id = ?', [payload.sub]);
-    if (user) {
+    const user = db.get('SELECT id, name, email, role, is_guest, is_active FROM users WHERE id = ?', [payload.sub]);
+    if (user && user.is_active !== 0) {
       req.user = user;
       req.isGuest = Boolean(user.is_guest);
     }
@@ -68,6 +68,20 @@ export function requireAuth(req, _res, next) {
 export function requireAdmin(req, _res, next) {
   if (!req.user) return next(unauthorized());
   if (req.user.role !== 'admin') return next(forbidden('Admin access only'));
+  next();
+}
+
+/** Admin or staff: day-to-day operations. */
+export function requireAdminOrStaff(req, _res, next) {
+  if (!req.user) return next(unauthorized());
+  if (!['admin', 'staff'].includes(req.user.role)) return next(forbidden('Admin access only'));
+  next();
+}
+
+/** Full admin only: money movement, settings, staff and coupons. */
+export function requireOwner(req, _res, next) {
+  if (!req.user) return next(unauthorized());
+  if (req.user.role !== 'admin') return next(forbidden('Only an account owner can do this'));
   next();
 }
 

@@ -128,6 +128,7 @@ function render() {
           <div class="summary-line"><span>Subtotal</span><strong>${money(order.subtotalPaise)}</strong></div>
           ${order.discountPaise ? `<div class="summary-line"><span>Discount</span><strong>− ${money(order.discountPaise)}</strong></div>` : ''}
           <div class="summary-line"><span>Delivery</span><strong>${order.deliveryPaise ? money(order.deliveryPaise) : 'Free'}</strong></div>
+          <div class="summary-line"><span>Tax</span><strong>${money(order.taxPaise || 0)}</strong></div>
           <hr class="divider">
           <div class="summary-line"><span class="summary-total">Total</span><span class="summary-total">${money(order.totalPaise)}</span></div>
         </div>

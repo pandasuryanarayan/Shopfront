@@ -115,8 +115,13 @@ export async function openDatabase({ file = config.dbFile, inMemory = false } = 
 /** Additive column migrations, so an existing database keeps working. */
 function migrate(db) {
   const columns = {
-    users: { is_guest: 'INTEGER NOT NULL DEFAULT 0' },
-    orders: { guest_email: 'TEXT' },
+    users: {
+      is_guest: 'INTEGER NOT NULL DEFAULT 0',
+      totp_secret: 'TEXT',
+      totp_enabled: 'INTEGER NOT NULL DEFAULT 0',
+      is_active: 'INTEGER NOT NULL DEFAULT 1',
+    },
+    orders: { guest_email: 'TEXT', tax_paise: 'INTEGER NOT NULL DEFAULT 0' },
     cart_items: { colour: "TEXT NOT NULL DEFAULT 'Default'" },
     order_items: { colour: "TEXT NOT NULL DEFAULT 'Default'" },
   };

@@ -1,4 +1,4 @@
-import { config } from '../config.js';
+import { getSettings } from './settings.js';
 
 /**
  * Applies a coupon to a subtotal. Returns the discount in paise.
@@ -14,18 +14,20 @@ export function couponDiscount(coupon, subtotalPaise) {
   return Math.max(0, Math.min(discount, subtotalPaise));
 }
 
-export function deliveryFee(subtotalPaise) {
-  return subtotalPaise >= config.freeDeliveryThresholdPaise ? 0 : config.deliveryFeePaise;
+export function deliveryFee(subtotalPaise, settings = getSettings()) {
+  return subtotalPaise >= settings.freeDeliveryThreshold ? 0 : settings.deliveryFee;
 }
 
-export function computeTotals({ subtotalPaise, coupon }) {
+export function computeTotals({ subtotalPaise, coupon, settings = getSettings() }) {
   const discount = couponDiscount(coupon, subtotalPaise);
   const taxable = subtotalPaise - discount;
-  const delivery = deliveryFee(taxable);
+  const delivery = deliveryFee(taxable, settings);
+  const tax = Math.round((taxable * settings.taxPercent) / 100);
   return {
     subtotalPaise,
     discountPaise: discount,
     deliveryPaise: delivery,
-    totalPaise: Math.max(0, taxable + delivery),
+    taxPaise: tax,
+    totalPaise: Math.max(0, taxable + delivery + tax),
   };
 }

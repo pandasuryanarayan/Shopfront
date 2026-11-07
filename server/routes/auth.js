@@ -8,6 +8,9 @@ import { asyncHandler } from '../lib/errors.js';
 import { userDto } from '../lib/serialize.js';
 import { signToken, setAuthCookie, clearAuthCookie, clearGuestCookie, cookieNameFor } from '../middleware/auth.js';
 import { forbidden } from '../lib/errors.js';
+import jwt from 'jsonwebtoken';
+import { config } from '../config.js';
+import { verifyTotp } from '../lib/totp.js';
 
 const router = Router();
 
@@ -52,10 +55,39 @@ router.post('/login', asyncHandler(async (req, res) => {
   const ok = await bcrypt.compare(password, hash);
   if (!user || !ok) throw unauthorized('Email or password is incorrect');
 
-  // The admin panel is a separate door: only administrators get a session there.
-  if (req.app.locals.surface === 'admin' && user.role !== 'admin') {
+  if (user.is_active === 0) throw forbidden('This account has been deactivated');
+
+  // The admin panel is a separate door: only admins and staff get a session there.
+  if (req.app.locals.surface === 'admin' && !['admin', 'staff'].includes(user.role)) {
     throw forbidden('This account does not have admin access');
   }
+
+  // Two-factor: hand back a short-lived ticket instead of a session.
+  if (user.totp_enabled) {
+    const tempToken = jwt.sign({ sub: user.id, purpose: '2fa' }, config.jwtSecret, { expiresIn: '5m' });
+    return res.json({ twoFactor: true, tempToken });
+  }
+
+  setAuthCookie(res, signToken(user), cookieNameFor(req));
+  res.json({ user: userDto(user) });
+}));
+
+const twoFactorSchema = z.object({ tempToken: z.string().min(10), code: z.string().trim().length(6) });
+
+router.post('/2fa', asyncHandler(async (req, res) => {
+  const { tempToken, code } = parse(twoFactorSchema, req.body);
+  let payload;
+  try {
+    payload = jwt.verify(tempToken, config.jwtSecret);
+  } catch {
+    throw unauthorized('That sign-in attempt expired — start again');
+  }
+  if (payload.purpose !== '2fa') throw unauthorized('That sign-in attempt is not valid');
+
+  const db = getDb();
+  const user = db.get('SELECT * FROM users WHERE id = ?', [payload.sub]);
+  if (!user || !user.totp_enabled) throw unauthorized('Two-factor is not enabled for this account');
+  if (!verifyTotp(user.totp_secret, code)) throw unauthorized('That code is not valid');
 
   setAuthCookie(res, signToken(user), cookieNameFor(req));
   res.json({ user: userDto(user) });

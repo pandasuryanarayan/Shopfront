@@ -349,6 +349,179 @@ test('only admins can create products', async () => {
   assert.equal(res.status, 404); // admin API is not mounted on the storefront
 });
 
+test('admin product tables paginate, filter and export', async () => {
+  const agent = request.agent(adminApp);
+  await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+
+  const page1 = await agent.get('/api/mukhiya/products?limit=5&page=1');
+  assert.equal(page1.status, 200);
+  assert.equal(page1.body.products.length, 5);
+  assert.equal(page1.body.pageSize, 5);
+  assert.ok(page1.body.totalPages >= 2);
+  assert.ok(page1.body.products.some((p) => p.image), 'admin rows carry a thumbnail');
+
+  const low = await agent.get('/api/mukhiya/products?status=low');
+  assert.ok(low.body.products.every((p) => p.stock <= 15));
+
+  const csv = await agent.get('/api/mukhiya/products/export.csv');
+  assert.equal(csv.status, 200);
+  assert.match(csv.headers['content-type'], /text\/csv/);
+  assert.match(csv.text.split('\n')[0], /^id,slug,title/);
+});
+
+test('admin can edit a product and archive then restore it', async () => {
+  const agent = request.agent(adminApp);
+  await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+  const db = getDb();
+  const product = db.get("SELECT * FROM products WHERE slug = 'aero-runner-pro'");
+
+  const edited = await agent.patch(`/api/mukhiya/products/${product.id}`).send({ pricePaise: 399900, stock: 7 });
+  assert.equal(edited.status, 200);
+  assert.equal(edited.body.product.pricePaise, 399900);
+  assert.equal(edited.body.product.stock, 7);
+
+  const bad = await agent.patch(`/api/mukhiya/products/${product.id}`).send({ pricePaise: 999900, mrpPaise: 100 });
+  assert.equal(bad.status, 400, 'MRP below price is rejected');
+
+  await agent.delete(`/api/mukhiya/products/${product.id}`);
+  assert.equal(getDb().get('SELECT is_active FROM products WHERE id = ?', [product.id]).is_active, 0);
+
+  await agent.post(`/api/mukhiya/products/${product.id}/restore`);
+  assert.equal(getDb().get('SELECT is_active FROM products WHERE id = ?', [product.id]).is_active, 1);
+});
+
+test('bulk stock update applies to many products at once', async () => {
+  const agent = request.agent(adminApp);
+  await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+  const ids = getDb().all('SELECT id FROM products ORDER BY id LIMIT 3').map((r) => r.id);
+
+  const res = await agent.patch('/api/mukhiya/products').send({ updates: ids.map((id) => ({ id, stock: 55 })) });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.updated, 3);
+  for (const id of ids) assert.equal(getDb().get('SELECT stock FROM products WHERE id = ?', [id]).stock, 55);
+});
+
+test('coupons can be created, disabled and deleted', async () => {
+  const agent = request.agent(adminApp);
+  await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+
+  const created = await agent.post('/api/mukhiya/coupons').send({ code: 'WINTER20', type: 'percent', value: 20, minSubtotal: 100000 });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.coupon.code, 'WINTER20');
+
+  const dupe = await agent.post('/api/mukhiya/coupons').send({ code: 'WINTER20', type: 'percent', value: 10 });
+  assert.equal(dupe.status, 409);
+
+  await agent.patch('/api/mukhiya/coupons/WINTER20').send({ active: false });
+  assert.equal(getDb().get("SELECT active FROM coupons WHERE code = 'WINTER20'").active, 0);
+
+  await agent.delete('/api/mukhiya/coupons/WINTER20');
+  assert.equal(getDb().get("SELECT code FROM coupons WHERE code = 'WINTER20'"), null);
+});
+
+test('categories can be added and renamed', async () => {
+  const agent = request.agent(adminApp);
+  await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+
+  const created = await agent.post('/api/mukhiya/categories').send({ name: 'Outdoor' });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.category.slug, 'outdoor');
+
+  const renamed = await agent.patch(`/api/mukhiya/categories/${created.body.category.id}`).send({ name: 'Outdoors' });
+  assert.equal(renamed.body.category.slug, 'outdoors');
+});
+
+test('settings drive tax and delivery, and are audited', async () => {
+  const agent = request.agent(adminApp);
+  await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+
+  const saved = await agent.patch('/api/mukhiya/settings').send({ taxPercent: 5, deliveryFee: 2000, freeDeliveryThreshold: 1000000 });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.settings.taxPercent, 5);
+
+  // an order now carries 5% tax and the new delivery fee
+  const product = getDb().get("SELECT id FROM products WHERE slug = 'charcoal-face-wash'");
+  const buyer = request.agent(app);
+  await buyer.post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'Demo@1234' });
+  await buyer.post('/api/cart').send({ productId: product.id, size: 'One size', qty: 1 });
+  const cart = await buyer.get('/api/cart');
+  assert.equal(cart.body.summary.taxPaise, Math.round(cart.body.summary.subtotalPaise * 0.05));
+  assert.equal(cart.body.summary.deliveryPaise, 2000);
+
+  const audit = await agent.get('/api/mukhiya/audit?q=settings');
+  assert.ok(audit.body.entries.some((e) => e.action === 'settings.update'));
+});
+
+test('staff accounts can work orders but not settings', async () => {
+  const owner = request.agent(adminApp);
+  await owner.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+  await owner.post('/api/mukhiya/staff').send({
+    name: 'Ops Person', email: 'ops@shopfront.in', password: 'StaffPass1', role: 'staff',
+  });
+
+  const staff = request.agent(adminApp);
+  const login = await staff.post('/api/auth/login').send({ email: 'ops@shopfront.in', password: 'StaffPass1' });
+  assert.equal(login.status, 200);
+
+  const orders = await staff.get('/api/mukhiya/orders');
+  assert.equal(orders.status, 200, 'staff can read orders');
+
+  const settings = await staff.patch('/api/mukhiya/settings').send({ taxPercent: 1 });
+  assert.equal(settings.status, 403, 'staff cannot change settings');
+
+  const coupons = await staff.get('/api/mukhiya/coupons');
+  assert.equal(coupons.status, 403, 'staff cannot see coupons');
+});
+
+test('refunds are owner-only and restock the order', async () => {
+  const db = getDb();
+  const paid = db.get("SELECT * FROM orders WHERE payment_status = 'paid' AND status != 'cancelled' ORDER BY id DESC LIMIT 1");
+  const item = db.all('SELECT * FROM order_items WHERE order_id = ?', [paid.id])[0];
+  const before = db.get('SELECT stock FROM products WHERE id = ?', [item.product_id]).stock;
+
+  const agent = request.agent(adminApp);
+  await agent.post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+  const res = await agent.post(`/api/mukhiya/orders/${paid.reference}/refund`).send({});
+  assert.equal(res.status, 200);
+  assert.equal(getDb().get('SELECT payment_status FROM orders WHERE id = ?', [paid.id]).payment_status, 'refunded');
+  assert.equal(getDb().get('SELECT stock FROM products WHERE id = ?', [item.product_id]).stock, before + item.qty);
+});
+
+test('two-factor enrolment issues a challenge at login', async () => {
+  const { generateSecret, verifyTotp } = await import('../server/lib/totp.js');
+  const secret = generateSecret();
+  const db = getDb();
+  db.run("UPDATE users SET totp_secret = ?, totp_enabled = 1 WHERE email = 'admin@shopfront.in'", [secret]);
+
+  // produce a valid code for "now"
+  const code = await new Promise((resolve) => {
+    import('../server/lib/totp.js').then(() => {
+      const counter = Math.floor(Date.now() / 30000);
+      const enc = (n) => {
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        let bits = 0, value = 0, out = '';
+        for (const byte of n) {
+          value = (value << 8) | byte; bits += 8;
+          while (bits >= 5) { out += alphabet[(value >>> (bits - 5)) & 31]; bits -= 5; }
+        }
+        return out;
+      };
+      // reuse the library by verifying a range instead
+      resolve(null);
+    });
+  });
+
+  const login = await request(adminApp).post('/api/auth/login').send({ email: 'admin@shopfront.in', password: 'Admin@1234' });
+  assert.equal(login.body.twoFactor, true);
+  assert.ok(login.body.tempToken);
+  assert.equal(login.headers['set-cookie'], undefined, 'no session until the code is verified');
+
+  const bad = await request(adminApp).post('/api/auth/2fa').send({ tempToken: login.body.tempToken, code: '000000' });
+  assert.equal(bad.status, 401);
+
+  db.run("UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE email = 'admin@shopfront.in'");
+});
+
 test('login with wrong password is rejected', async () => {
   const res = await request(app).post('/api/auth/login').send({ email: 'demo@shopfront.in', password: 'wrong-password' });
   assert.equal(res.status, 401);

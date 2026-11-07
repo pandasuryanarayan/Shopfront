@@ -29,12 +29,18 @@ The UI follows a design system that lives in Figma — tokens, components and si
 - Email + password authentication (bcrypt hashing, JWT in an httpOnly cookie)
 
 **Admin dashboard** — served at `/mukhiya`
-- Revenue, orders, AOV and customer KPIs
-- Monthly revenue chart, top categories, low-stock alerts
-- Order management with status transitions
-- Catalogue management: add products from a form (sizes inferred from the category,
-  slug generated, card colour picked) — a new product is in the shop immediately
-- Archive (soft delete)
+- Overview with a date range (7/30/90/365 days), revenue chart, top categories, low stock
+- Orders: search, status filter, pagination, detail drawer with items, address, payment,
+  timeline and per-order history; status transitions and manual refunds
+- Products: search, category/status filters, pagination, add **and edit** with photo upload,
+  archive/restore, bulk stock editing and CSV export
+- Customers: list with lifetime spend, drawer with their orders and addresses
+- Coupons: full CRUD (percent or flat, minimum order, cap, enable/disable)
+- Categories: add and rename (slug follows the name)
+- Settings: store name, support email, currency, tax %, free-delivery threshold and fee —
+  these drive live pricing, not config files
+- Staff & security: staff accounts with a reduced permission set, and TOTP two-factor
+- Audit log: every admin mutation is recorded with actor, entity and metadata
 
 **Two independent surfaces**
 - The storefront and the admin panel are separate Express apps on separate ports
@@ -47,6 +53,11 @@ The UI follows a design system that lives in Figma — tokens, components and si
 - Anonymous visitors get a lightweight guest session on first cart write, so the same
   cart, checkout, stock and order code paths run unchanged
 - Guest orders carry an email for the receipt and stay visible on that browser
+
+**Roles**
+- `admin` (owner): everything, including refunds, coupons, settings and staff
+- `staff`: orders, products, customers and the audit log — no money movement or store setup
+- `customer`: the storefront only
 
 **Engineering**
 - Strict server-side validation with Zod on every write endpoint
@@ -165,16 +176,26 @@ a `Authorization: Bearer <token>` header also works for API clients.
 | PATCH  | `/api/addresses/:id`              | user   | Edit / set default                 |
 | DELETE | `/api/addresses/:id`              | user   | Delete an address                  |
 | POST   | `/api/orders/:reference/cancel`   | user   | Cancel (restocks items)            |
-| GET    | `/api/mukhiya/stats`              | admin  | Dashboard aggregates               |
+| GET    | `/api/mukhiya/stats`              | admin  | Dashboard aggregates (`days`)      |
 | GET    | `/api/mukhiya/categories`         | admin  | Categories for the product form     |
 | GET    | `/api/mukhiya/config`             | admin  | Storefront URL for cross-links      |
-| GET    | `/api/mukhiya/products`           | admin  | Catalogue for admin                |
+| GET    | `/api/mukhiya/products`           | admin  | Catalogue (`q`, `status`, `category`, `page`) |
+| PATCH  | `/api/mukhiya/products`           | admin  | Bulk stock update                  |
+| GET    | `/api/mukhiya/products/export.csv`| admin  | CSV export                         |
+| POST   | `/api/mukhiya/products/:id/restore` | admin | Un-archive a product              |
 | POST   | `/api/mukhiya/products`           | admin  | Create a product                   |
 | PATCH  | `/api/mukhiya/products/:id`       | admin  | Update a product                   |
 | POST   | `/api/mukhiya/products/:id/images`| admin  | Upload a product photo             |
 | DELETE | `/api/mukhiya/products/:id`       | admin  | Archive a product                  |
 | GET    | `/api/mukhiya/orders`             | admin  | All orders                         |
 | PATCH  | `/api/mukhiya/orders/:ref/status` | admin  | Move an order through the pipeline |
+| POST   | `/api/mukhiya/orders/:ref/refund` | owner  | Refund an order and restock it     |
+| GET    | `/api/mukhiya/customers`          | admin  | Customer list                      |
+| GET    | `/api/mukhiya/coupons`            | owner  | Coupons (full CRUD)                |
+| GET    | `/api/mukhiya/settings`           | owner  | Store settings                     |
+| GET    | `/api/mukhiya/audit`              | admin  | Audit trail                        |
+| GET    | `/api/mukhiya/staff`              | owner  | Staff accounts                     |
+| POST   | `/api/mukhiya/2fa/setup`          | admin  | Begin TOTP enrolment               |
 
 Demo coupons: `WELCOME10` (10% off, min ₹999) and `FLAT250` (₹250 off, min ₹1,999).
 

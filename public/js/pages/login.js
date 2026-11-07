@@ -99,10 +99,17 @@ async function submit(event) {
 
   try {
     const res = mode === 'login' ? await api.login(data) : await api.register(data);
+
+    // Two-factor accounts get a challenge instead of a session.
+    if (res.twoFactor) {
+      renderTwoFactor(res.tempToken);
+      return;
+    }
+
     store.setUser(res.user);
     toast(`Welcome, ${res.user.name.split(' ')[0]}`, 'success');
     if (next !== '/') location.href = next;
-    else location.href = res.user.role === 'admin' ? '/mukhiya' : '/';
+    else location.href = res.user.role === 'admin' || res.user.role === 'staff' ? '/mukhiya' : '/';
   } catch (err) {
     errorBox.textContent = err.message || 'Could not sign you in';
     errorBox.classList.remove('hide');
@@ -110,6 +117,40 @@ async function submit(event) {
     submitBtn.textContent = mode === 'login' ? 'Sign in' : 'Create account';
     if (err.details?.length) errorBox.textContent = err.details.map((d) => d.message).join(' · ');
   }
+}
+
+function renderTwoFactor(tempToken) {
+  panel.innerHTML = `
+    <div>
+      <h2 class="h2">Two-factor code</h2>
+      <p class="tiny">Enter the 6-digit code from your authenticator app.</p>
+    </div>
+    <form class="stack" id="totp-form">
+      <div class="field">
+        <label for="totp">Authentication code</label>
+        <input class="input" id="totp" name="code" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code" required>
+      </div>
+      <div class="alert alert-error hide" id="totp-error"></div>
+      <button class="btn btn-primary btn-lg btn-block" type="submit" id="totp-submit">Verify and sign in</button>
+    </form>`;
+
+  qs('#totp').focus();
+  qs('#totp-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const btn = qs('#totp-submit');
+    btn.disabled = true;
+    try {
+      const res = await api.twoFactor({ tempToken, code: qs('#totp').value.trim() });
+      store.setUser(res.user);
+      toast(`Welcome back, ${res.user.name.split(' ')[0]}`, 'success');
+      location.href = next !== '/' ? next : '/mukhiya';
+    } catch (err) {
+      const box = qs('#totp-error');
+      box.textContent = err.message || 'That code did not work';
+      box.classList.remove('hide');
+      btn.disabled = false;
+    }
+  });
 }
 
 render();

@@ -387,3 +387,34 @@
 .timeline-body { padding-bottom: 18px; }
 .timeline-body strong { font-size: 14px; }
 .timeline-body .tiny { display: block; }
+
+/* ---------- admin tables, drawer ---------- */
+.toolbar {
+  display: flex; gap: 10px; padding: 16px 20px; flex-wrap: wrap; align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.toolbar .input { flex: 1; min-width: 200px; height: 44px; }
+.toolbar .btn { height: 44px; }
+
+.drawer-backdrop {
+  position: fixed; inset: 0; z-index: 200; background: rgba(18, 18, 26, 0.45);
+  display: flex; justify-content: flex-end; animation: fade-in 0.15s var(--ease);
+}
+.drawer {
+  width: min(580px, 100%); height: 100%; background: var(--surface);
+  display: flex; flex-direction: column; box-shadow: var(--shadow-raised);
+  animation: drawer-in 0.2s var(--ease);
+}
+@keyframes drawer-in { from { transform: translateX(28px); opacity: 0; } }
+.drawer-head {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+  padding: 20px 24px; border-bottom: 1px solid var(--border);
+}
+.drawer-body { padding: 20px 24px; display: grid; gap: 18px; overflow-y: auto; flex: 1; align-content: start; }
+.drawer-foot {
+  padding: 16px 24px; border-top: 1px solid var(--border);
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  .drawer { width: 100%; }
+}

@@ -68,9 +68,9 @@ router.post('/', asyncHandler(async (req, res) => {
 
   const orderId = db.transaction(() => {
     const { lastInsertRowid } = db.run(
-      `INSERT INTO orders (reference, user_id, status, payment_method, payment_status, subtotal_paise, discount_paise, delivery_paise, total_paise, coupon_code, address_json, guest_email)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [reference, req.user.id, 'placed', paymentMethod, payment.status, totals.subtotalPaise, totals.discountPaise, totals.deliveryPaise, totals.totalPaise, coupon ? coupon.code : null, JSON.stringify(address), req.isGuest ? guestEmail : null]
+      `INSERT INTO orders (reference, user_id, status, payment_method, payment_status, subtotal_paise, discount_paise, delivery_paise, tax_paise, total_paise, coupon_code, address_json, guest_email)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [reference, req.user.id, 'placed', paymentMethod, payment.status, totals.subtotalPaise, totals.discountPaise, totals.deliveryPaise, totals.taxPaise, totals.totalPaise, coupon ? coupon.code : null, JSON.stringify(address), req.isGuest ? guestEmail : null]
     );
 
     for (const item of items) {

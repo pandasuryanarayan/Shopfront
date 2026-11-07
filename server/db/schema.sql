@@ -5,7 +5,10 @@ CREATE TABLE IF NOT EXISTS users (
   name          TEXT    NOT NULL,
   email         TEXT    NOT NULL UNIQUE,
   password_hash TEXT    NOT NULL,
-  role          TEXT    NOT NULL DEFAULT 'customer' CHECK (role IN ('customer','admin')),
+  role          TEXT    NOT NULL DEFAULT 'customer' CHECK (role IN ('customer','admin','staff')),
+  totp_secret   TEXT,
+  totp_enabled  INTEGER NOT NULL DEFAULT 0,
+  is_active     INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -77,6 +80,7 @@ CREATE TABLE IF NOT EXISTS orders (
   subtotal_paise  INTEGER NOT NULL,
   discount_paise  INTEGER NOT NULL DEFAULT 0,
   delivery_paise  INTEGER NOT NULL DEFAULT 0,
+  tax_paise       INTEGER NOT NULL DEFAULT 0,
   total_paise     INTEGER NOT NULL,
   coupon_code     TEXT,
   address_json    TEXT    NOT NULL,
@@ -168,3 +172,27 @@ CREATE TABLE IF NOT EXISTS return_requests (
   created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
   UNIQUE (order_item_id)
 );
+
+
+-- ---------------------------------------------------------------------------
+-- Admin: store settings, audit trail
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_id    INTEGER,
+  actor_email TEXT,
+  action      TEXT    NOT NULL,
+  entity      TEXT,
+  entity_id   TEXT,
+  meta        TEXT,
+  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);

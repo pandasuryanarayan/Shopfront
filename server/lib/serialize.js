@@ -38,6 +38,7 @@ export function orderDto(row, items = []) {
     subtotalPaise: row.subtotal_paise,
     discountPaise: row.discount_paise,
     deliveryPaise: row.delivery_paise,
+    taxPaise: row.tax_paise || 0,
     totalPaise: row.total_paise,
     couponCode: row.coupon_code,
     guestEmail: row.guest_email || null,

@@ -182,7 +182,10 @@ export async function seed({ silent = false } = {}) {
       for (let k = 0; k < perMonth; k++) {
         const buyer = customerIds[(monthsAgo + k) % customerIds.length];
         const picks = [allProducts[(orderNo * 3) % allProducts.length], allProducts[(orderNo * 7 + 4) % allProducts.length]];
-        const subtotal = picks.reduce((sum, p) => sum + p.price_paise, 0);
+        // Quantities must drive the totals, or the admin drawer shows lines that
+        // do not add up to the order total.
+        const lines = picks.map((p, idx) => ({ product: p, qty: 1 + ((orderNo + idx) % 2) }));
+        const subtotal = lines.reduce((sum, l) => sum + l.product.price_paise * l.qty, 0);
         const discount = orderNo % 4 === 0 ? Math.round(subtotal * 0.1) : 0;
         const delivery = subtotal - discount >= 49900 ? 0 : 4900;
         const status = monthsAgo === 0 ? STATUSES[orderNo % 3] : 'delivered';
@@ -197,9 +200,9 @@ export async function seed({ silent = false } = {}) {
             JSON.stringify({ fullName: CUSTOMERS.find((_, i) => customerIds[i + 1] === buyer)?.[0] || 'Suryanarayan Panda', phone: '+91 98765 43210', line1: '42, 3rd Cross, Indiranagar', city: 'Bengaluru', state: 'Karnataka', pincode: '560038' }),
             `-${daysAgo} days`]
         );
-        picks.forEach((p, idx) => {
+        lines.forEach((line, idx) => {
           db.run('INSERT INTO order_items (order_id, product_id, title, size, unit_price_paise, qty) VALUES (?,?,?,?,?,?)',
-            [ord.lastInsertRowid, p.id, p.title, idx === 0 ? 'One size' : 'UK 9', p.price_paise, 1 + (orderNo % 2)]);
+            [ord.lastInsertRowid, line.product.id, line.product.title, idx === 0 ? 'One size' : 'UK 9', line.product.price_paise, line.qty]);
         });
         orderNo++;
       }
