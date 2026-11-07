@@ -18,7 +18,14 @@ The UI follows a design system that lives in Figma — tokens, components and si
 - Product detail with gallery, size picker (sold-out sizes disabled), quantity, reviews and related products
 - Cart with quantity steppers, coupon codes, delivery thresholds and live totals
 - Checkout with address validation, UPI / card / COD payment selection and server-computed totals
-- Order history with status tracking and self-service cancellation
+- Wishlist with working save/remove, a dedicated page and a header badge
+- Write a review with a star picker (one review per customer per product)
+- Saved addresses: an address book at checkout, plus "save this address"
+- Guest checkout — no account needed, just an email for the receipt
+- Order detail page with a status timeline, and self-service cancellation
+- Returns and exchanges on delivered items, within a 7-day window
+- Colour variants per product, carried through cart and order lines
+- Search autocomplete, recently-viewed rail and a "Picked for you" home rail
 - Email + password authentication (bcrypt hashing, JWT in an httpOnly cookie)
 
 **Admin dashboard** — served at `/mukhiya`
@@ -35,6 +42,11 @@ The UI follows a design system that lives in Figma — tokens, components and si
   ignore the port, so distinct names are what actually keeps the two sessions apart
 - The admin surface only serves the admin panel, its assets and its own API; customer accounts
   cannot sign in there, and `/mukhiya` on the storefront redirects to the admin origin
+
+**Guest shopping**
+- Anonymous visitors get a lightweight guest session on first cart write, so the same
+  cart, checkout, stock and order code paths run unchanged
+- Guest orders carry an email for the receipt and stay visible on that browser
 
 **Engineering**
 - Strict server-side validation with Zod on every write endpoint
@@ -133,7 +145,8 @@ a `Authorization: Bearer <token>` header also works for API clients.
 | GET    | `/api/auth/me`                    | user   | Current user                       |
 | GET    | `/api/categories`                 | —      | Categories with product counts     |
 | GET    | `/api/products`                   | —      | List + filter (`q`, `category`, `minPrice`, `maxPrice`, `size`, `sort`, `page`, `limit`) |
-| GET    | `/api/products/:slug`             | —      | Product, reviews and related items  |
+| GET    | `/api/products/:slug`             | —      | Product, reviews, images, colours and related items |
+| GET    | `/api/search/suggestions`         | —      | Type-ahead suggestions             |
 | POST   | `/api/products/:slug/reviews`     | user   | Create or update your review       |
 | GET    | `/api/cart`                       | user   | Cart with totals                   |
 | POST   | `/api/cart`                       | user   | Add an item                        |
@@ -142,7 +155,15 @@ a `Authorization: Bearer <token>` header also works for API clients.
 | POST   | `/api/cart/coupon`                | user   | Validate a coupon                  |
 | POST   | `/api/orders`                     | user   | Place an order from the cart       |
 | GET    | `/api/orders`                     | user   | Order history                      |
-| GET    | `/api/orders/:reference`          | user   | Single order                       |
+| GET    | `/api/orders/:reference`          | user   | Single order with returns          |
+| POST   | `/api/orders/:reference/returns`  | user   | Request a return on an item        |
+| GET    | `/api/wishlist`                   | user   | Saved products                     |
+| POST   | `/api/wishlist`                   | user   | Save a product                     |
+| DELETE | `/api/wishlist/:productId`        | user   | Remove from wishlist               |
+| GET    | `/api/addresses`                  | user   | Saved addresses                    |
+| POST   | `/api/addresses`                  | user   | Add an address                     |
+| PATCH  | `/api/addresses/:id`              | user   | Edit / set default                 |
+| DELETE | `/api/addresses/:id`              | user   | Delete an address                  |
 | POST   | `/api/orders/:reference/cancel`   | user   | Cancel (restocks items)            |
 | GET    | `/api/mukhiya/stats`              | admin  | Dashboard aggregates               |
 | GET    | `/api/mukhiya/categories`         | admin  | Categories for the product form     |
@@ -150,6 +171,7 @@ a `Authorization: Bearer <token>` header also works for API clients.
 | GET    | `/api/mukhiya/products`           | admin  | Catalogue for admin                |
 | POST   | `/api/mukhiya/products`           | admin  | Create a product                   |
 | PATCH  | `/api/mukhiya/products/:id`       | admin  | Update a product                   |
+| POST   | `/api/mukhiya/products/:id/images`| admin  | Upload a product photo             |
 | DELETE | `/api/mukhiya/products/:id`       | admin  | Archive a product                  |
 | GET    | `/api/mukhiya/orders`             | admin  | All orders                         |
 | PATCH  | `/api/mukhiya/orders/:ref/status` | admin  | Move an order through the pipeline |
@@ -176,8 +198,10 @@ application depends only on the returned `{ ok, status, gatewayRef }` shape.
    and set `ADMIN_PUBLIC_URL` so the storefront redirect points at the right place.
 2. Terminate TLS in front of the app — the auth cookie switches to `Secure` automatically.
 3. Point `DB_FILE` at a persistent volume, and back it up.
-4. Add real product imagery: replace the generated gradient artwork in `public/js/ui.js`
-   (`productArt`) with `<img>` tags once products have image URLs.
+4. Replace the demo photography. `public/uploads/demo/` holds procedurally generated
+   studio mockups (see `scripts/generate_demo_images.py`) so the image pipeline is exercised
+   end to end; upload real photos per product from the admin API or drop files into
+   `public/uploads/`. Products fall back to generated gradient artwork when they have no image.
 5. Swap the mock gateway for your payment provider and wire webhooks for payment status.
 
 A `Dockerfile` is included:
