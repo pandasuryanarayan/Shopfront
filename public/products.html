@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shop all — Shopfront</title>
+  <meta name="description" content="Browse footwear, apparel, bags, home, beauty and tech at Shopfront.">
+  <meta name="theme-color" content="#5B3DF5">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/pages.css">
+</head>
+<body>
+  <main class="page" id="app">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="/">Home</a><span>/</span><span class="current" id="crumb-current">All products</span>
+      </nav>
+      <div class="row-between" style="margin-bottom:24px">
+        <div>
+          <h1 class="h1" id="page-title">All products</h1>
+          <p class="lead" id="page-sub">Free delivery over ₹499</p>
+        </div>
+        <label class="row" style="gap:8px;font-size:14px">
+          <span class="muted">Sort by</span>
+          <select class="select" id="sort" style="width:auto;height:44px">
+            <option value="popular">Popularity</option>
+            <option value="newest">Newest first</option>
+            <option value="price_asc">Price: low to high</option>
+            <option value="price_desc">Price: high to low</option>
+            <option value="rating">Customer rating</option>
+          </select>
+        </label>
+      </div>
+      <div class="listing-layout">
+        <aside class="filters card card-tight" id="filters"></aside>
+        <div>
+          <div class="active-filters" id="active-filters"></div>
+          <div class="product-grid" id="grid"></div>
+          <div class="pagination" id="pagination"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/listing.js"></script>
+</body>
+</html>

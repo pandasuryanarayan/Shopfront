@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shopfront — Everyday essentials, elevated</title>
+  <meta name="description" content="Shop thoughtfully made footwear, apparel, homeware and tech. Free delivery over ₹499, 7-day returns, UPI and COD.">
+  <meta name="theme-color" content="#5B3DF5">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/pages.css">
+</head>
+<body>
+  <main class="page" id="app">
+    <div class="container">
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow">New season · 2026</span>
+          <h1>Everyday essentials, elevated.</h1>
+          <p>Thoughtfully made apparel, footwear and homeware. Free delivery over ₹499 and returns within 7 days.</p>
+          <div class="hero-actions">
+            <a class="btn btn-secondary btn-lg" href="/products.html?sort=newest">Shop new arrivals</a>
+            <a class="btn btn-secondary btn-lg" href="/products.html?sort=price_asc">Explore deals</a>
+          </div>
+        </div>
+        <div class="hero-card" id="hero-card"></div>
+      </section>
+
+      <section class="trust-strip" style="margin-top:40px" id="trust"></section>
+
+      <section class="section" style="margin-top:56px">
+        <div class="section-head">
+          <div><h2>Shop by category</h2><p class="lead">Six edits, one standard of making.</p></div>
+          <a class="link-arrow" href="/products.html">View all →</a>
+        </div>
+        <div class="category-grid" id="categories"></div>
+      </section>
+
+      <section class="section" style="margin-top:56px">
+        <div class="section-head">
+          <div><h2>Trending now</h2><p class="lead">Most-loved pieces this week.</p></div>
+          <a class="link-arrow" href="/products.html?sort=popular">View all →</a>
+        </div>
+        <div class="product-grid" id="trending"></div>
+      </section>
+
+      <section class="section" style="margin-top:56px">
+        <div class="deal-band">
+          <div style="display:grid;gap:16px;justify-items:start">
+            <span class="eyebrow">Deal of the day</span>
+            <h2>Up to 40% off winter layering</h2>
+            <div class="countdown" id="countdown"></div>
+            <a class="btn btn-accent btn-lg" href="/products.html?sort=price_asc">Shop the drop</a>
+          </div>
+          <div class="deal-art" id="deal-art"></div>
+        </div>
+      </section>
+
+      <section class="section" style="margin-top:56px">
+        <div class="section-head">
+          <div><h2>New this week</h2><p class="lead">Fresh arrivals, straight from the studio.</p></div>
+          <a class="link-arrow" href="/products.html?sort=newest">View all →</a>
+        </div>
+        <div class="product-grid" id="new-arrivals"></div>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="/js/pages/home.js"></script>
+</body>
+</html>

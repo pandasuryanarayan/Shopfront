@@ -1,0 +1,27 @@
+{
+  "name": "shopfront",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shopfront — a production-grade e-commerce web application (Node.js, Express, SQLite, vanilla HTML/CSS/JS)",
+  "type": "module",
+  "main": "server/index.js",
+  "engines": { "node": ">=18.17" },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "seed": "node server/db/seed.js",
+    "test": "node --test tests/"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "sql.js": "^1.11.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0"
+  }
+}
