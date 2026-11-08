@@ -24,7 +24,6 @@ function wasmDir() {
     path.join(process.cwd(), 'node_modules/sql.js/dist'),
     path.join(process.cwd(), '..', 'node_modules/sql.js/dist'),
     '/var/task/node_modules/sql.js/dist',
-    path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'node_modules/sql.js/dist'),
   ];
   return candidates.find((dir) => {
     try { return fs.existsSync(path.join(dir, 'sql-wasm.wasm')); } catch { return false; }

@@ -214,7 +214,7 @@ export async function seed({ silent = false } = {}) {
   db.flush();
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
   seed().then(() => {
     console.log('Seed complete.');
     process.exit(0);

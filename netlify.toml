@@ -7,7 +7,10 @@
   # esbuild bundles the ESM entry point (zisi wraps it in require(), which fails)
   node_bundler = "esbuild"
   # sql.js loads its wasm at runtime; ship it alongside the bundle
-  included_files = ["node_modules/sql.js/dist/sql-wasm.wasm"]
+  included_files = [
+    "node_modules/sql.js/dist/sql-wasm.wasm",
+    "server/db/schema.sql",
+  ]
 
 [[redirects]]
   from = "/api/*"

@@ -1,8 +1,17 @@
+import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, '..');
+/**
+ * Project root. Resolved from the working directory rather than import.meta.url,
+ * because serverless bundlers compile this to CommonJS where import.meta is
+ * undefined. Both `npm start` and the Netlify function run with the root as cwd.
+ */
+function findRoot() {
+  const candidates = [process.env.APP_ROOT, process.cwd(), path.resolve(process.cwd(), '..')].filter(Boolean);
+  return candidates.find((dir) => fs.existsSync(path.join(dir, 'server', 'db', 'schema.sql'))) || process.cwd();
+}
+
+const root = findRoot();
 
 const env = process.env.NODE_ENV || 'development';
 const jwtSecret = process.env.JWT_SECRET || 'dev-only-secret-change-me-in-production';
