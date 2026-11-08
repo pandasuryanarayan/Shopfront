@@ -1,19 +1,17 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
-import fs from 'node:fs';
-import path from 'node:path';
-import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { getDb } from '../db/index.js';
 import { parse } from '../lib/validate.js';
-import { notFound, badRequest, conflict, forbidden } from '../lib/errors.js';
+import { notFound, badRequest, conflict, asyncHandler } from '../lib/errors.js';
 import { requireAdmin, requireAdminOrStaff, requireOwner } from '../middleware/auth.js';
 import { productDto, orderDto, orderItemDto } from '../lib/serialize.js';
 import { config } from '../config.js';
 import { getSettings, saveSettings } from '../services/settings.js';
 import { refund as refundPayment } from '../services/payment.js';
 import { generateSecret, verifyTotp, otpauthUrl } from '../lib/totp.js';
+import { saveUpload, deleteUpload } from '../storage.js';
 
 const router = Router();
 router.use(requireAdminOrStaff);
@@ -295,17 +293,8 @@ router.post('/products/:id/restore', (req, res) => {
 });
 
 /* ------------------------------------------------------------ product images */
-const UPLOAD_DIR = path.join(config.root, config.uploadDir);
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-    filename: (_req, file, cb) => {
-      const ext = (path.extname(file.originalname) || '.jpg').toLowerCase().replace(/[^.a-z0-9]/g, '') || '.jpg';
-      cb(null, `${Date.now()}-${crypto.randomUUID().slice(0, 8)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 6 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => cb(null, /^image\/(jpeg|png|webp|gif|avif)$/.test(file.mimetype)),
 });
@@ -315,34 +304,32 @@ router.get('/products/:id/images', (req, res) => {
   res.json({ images: db.all('SELECT id, url, alt, sort FROM product_images WHERE product_id = ? ORDER BY sort', [Number(req.params.id)]) });
 });
 
-router.post('/products/:id/images', upload.single('image'), (req, res) => {
+router.post('/products/:id/images', upload.single('image'), asyncHandler(async (req, res) => {
   const db = getDb();
   const product = db.get('SELECT id, title FROM products WHERE id = ?', [Number(req.params.id)]);
   if (!product) throw notFound('Product not found');
   if (!req.file) throw badRequest('Attach an image file (JPEG, PNG, WebP or GIF)');
 
-  const url = `/uploads/${req.file.filename}`;
+  const url = await saveUpload({ buffer: req.file.buffer, originalname: req.file.originalname, mimetype: req.file.mimetype });
   const sort = db.get('SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?', [product.id]).n;
   db.run('INSERT INTO product_images (product_id, url, alt, sort) VALUES (?,?,?,?)',
     [product.id, url, `${product.title} image ${sort + 1}`, sort]);
   db.flush();
   audit(req, 'product.image_upload', 'product', product.id, { url });
   res.status(201).json({ image: { url, alt: `${product.title} image ${sort + 1}` } });
-});
+}));
 
-router.delete('/products/:id/images/:imageId', (req, res) => {
+router.delete('/products/:id/images/:imageId', asyncHandler(async (req, res) => {
   const db = getDb();
   const row = db.get('SELECT * FROM product_images WHERE id = ? AND product_id = ?',
     [Number(req.params.imageId), Number(req.params.id)]);
   if (!row) throw notFound('Image not found');
   db.run('DELETE FROM product_images WHERE id = ?', [row.id]);
   db.flush();
-  if (row.url.startsWith('/uploads/') && !row.url.startsWith('/uploads/demo/')) {
-    fs.rm(path.join(UPLOAD_DIR, path.basename(row.url)), { force: true }, () => {});
-  }
+  if (!row.url.startsWith('/uploads/demo/')) await deleteUpload(row.url);
   audit(req, 'product.image_delete', 'product', Number(req.params.id), { url: row.url });
   res.json({ ok: true });
-});
+}));
 
 /* -------------------------------------------------------------------- orders */
 router.get('/orders', (req, res) => {

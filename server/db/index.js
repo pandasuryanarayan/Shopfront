@@ -7,6 +7,27 @@ import { config } from '../config.js';
 const require = createRequire(import.meta.url);
 
 let instance = null;
+let blobStore = null;
+
+/** On Netlify the database lives in Netlify Blobs rather than on disk. */
+export function useBlobStore(store) {
+  blobStore = store;
+}
+
+const BLOB_KEY = 'shopfront.db';
+
+/** Finds sql.js' wasm file whether we run from source or a bundled function. */
+function wasmDir() {
+  const candidates = [];
+  try {
+    candidates.push(path.dirname(require.resolve('sql.js/dist/sql-wasm.js')));
+  } catch {
+    /* bundled: require.resolve may not work */
+  }
+  candidates.push(path.join(process.cwd(), 'node_modules/sql.js/dist'));
+  candidates.push('/var/task/node_modules/sql.js/dist');
+  return candidates.find((dir) => fs.existsSync(path.join(dir, 'sql-wasm.wasm'))) || candidates[0];
+}
 
 const normalise = (params = []) =>
   params.map((p) => {
@@ -73,6 +94,8 @@ class Database {
 
   /** Writes the in-memory database to disk atomically. */
   flush() {
+    // With a blob store the bytes are uploaded after the request finishes.
+    if (blobStore) return;
     if (!this.dirty || !this.file) return;
     const dir = path.dirname(this.file);
     fs.mkdirSync(dir, { recursive: true });
@@ -86,23 +109,43 @@ class Database {
     this.flush();
     this.db.close();
   }
+
+  /** Uploads the database to the blob store when it has changed. */
+  async persist() {
+    if (!blobStore || !this.dirty) return false;
+    const bytes = Buffer.from(this.db.export());
+    await blobStore.set(BLOB_KEY, bytes, { metadata: { contentType: 'application/x-sqlite3' } });
+    this.dirty = false;
+    return true;
+  }
 }
 
 export async function openDatabase({ file = config.dbFile, inMemory = false } = {}) {
   if (instance) return instance;
   const SQL = await initSqlJs({
-    locateFile: (f) => path.join(path.dirname(require.resolve('sql.js/dist/sql-wasm.js')), f),
+    locateFile: (f) => path.join(wasmDir(), f),
   });
 
   let sqlDb;
   const target = inMemory ? null : file;
-  if (target && fs.existsSync(target)) {
+
+  // Prefer the blob copy when one exists (serverless deployments).
+  let restored = null;
+  if (blobStore && !inMemory) {
+    const stored = await blobStore.get(BLOB_KEY, { type: 'arrayBuffer' }).catch(() => null);
+    if (stored) restored = new Uint8Array(stored);
+  }
+
+  if (restored) {
+    sqlDb = new SQL.Database(restored);
+  } else if (target && fs.existsSync(target)) {
     sqlDb = new SQL.Database(new Uint8Array(fs.readFileSync(target)));
   } else {
     sqlDb = new SQL.Database();
   }
 
   const db = new Database(sqlDb, target);
+  db.dirty = Boolean(blobStore) && !restored; // a fresh blob copy needs uploading
   db.exec('PRAGMA foreign_keys = ON;');
   const schema = fs.readFileSync(path.join(config.root, 'server', 'db', 'schema.sql'), 'utf8');
   db.exec(schema);

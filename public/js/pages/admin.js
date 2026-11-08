@@ -1,6 +1,8 @@
-import { api, uploadProductImage } from '../api.js';
+import { api, uploadProductImage, setSurface } from '../api.js';
 import { qs, qsa, esc, money, statusBadge, toast, handleError, icon, debounce } from '../ui.js';
 import { store } from '../store.js';
+
+setSurface('admin');
 
 const root = qs('#admin-root');
 const NAV = [

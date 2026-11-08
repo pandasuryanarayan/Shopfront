@@ -7,12 +7,22 @@ export class ApiError extends Error {
   }
 }
 
+let surface = 'store';
+
+/** Admin pages identify themselves so they get their own session cookie. */
+export function setSurface(next) {
+  surface = next;
+}
+
 async function request(path, { method = 'GET', body, signal } = {}) {
   let res;
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  if (surface === 'admin') headers['X-Surface'] = 'admin';
   try {
     res = await fetch(`/api${path}`, {
       method,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      headers,
       body: body ? JSON.stringify(body) : undefined,
       credentials: 'same-origin',
       signal,
@@ -128,7 +138,7 @@ export async function uploadProductImage(productId, file) {
   const form = new FormData();
   form.append('image', file);
   const res = await fetch(`/api/mukhiya/products/${productId}/images`, {
-    method: 'POST', body: form, credentials: 'same-origin',
+    method: 'POST', body: form, credentials: 'same-origin', headers: { 'X-Surface': 'admin' },
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(data?.error?.message || 'Upload failed', res.status, data?.error?.code);

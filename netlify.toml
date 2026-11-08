@@ -1,0 +1,24 @@
+[build]
+  publish = "public"
+  command = "echo 'Shopfront: no build step — static frontend + one serverless function'"
+
+[functions]
+  directory = "netlify/functions"
+  # zisi keeps node_modules intact so sql.js can locate its wasm file at runtime
+  node_bundler = "zisi"
+  included_files = ["node_modules/sql.js/dist/sql-wasm.wasm"]
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/mukhiya"
+  to = "/mukhiya.html"
+  status = 200
+
+[[headers]]
+  for = "/uploads/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
