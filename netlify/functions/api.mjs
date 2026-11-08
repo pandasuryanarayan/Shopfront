@@ -1,4 +1,5 @@
 import serverless from 'serverless-http';
+import { connectLambda } from '@netlify/blobs';
 import { createApp } from '../../server/app.js';
 import { openDatabase, getDb, useBlobStore } from '../../server/db/index.js';
 import { seed } from '../../server/db/seed.js';
@@ -67,6 +68,15 @@ async function bootstrap() {
 }
 
 export async function handler(event, context) {
+  // Modern runtimes inject the blob context into the environment; the classic
+  // Lambda signature carries it on the event instead. connectLambda handles the
+  // latter and is a no-op when the environment is already configured.
+  try {
+    connectLambda(event);
+  } catch (err) {
+    console.warn('connectLambda failed:', err?.message);
+  }
+
   booted ||= bootstrap();
   const fn = await booted;
   const response = await fn(event, context);
