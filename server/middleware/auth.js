@@ -9,8 +9,8 @@ export function signToken(user) {
 }
 
 export function cookieNameFor(req) {
-  // A single-origin deployment (Netlify) still needs separate sessions, so the
-  // admin client identifies itself with a header instead of a second port.
+  // On a single-origin deployment the two surfaces still need separate sessions,
+  // so the admin client identifies itself with a header instead of a second port.
   if (req.get?.('x-surface') === 'admin') return config.adminCookieName;
   return req.app?.locals?.cookieName || config.cookieName;
 }

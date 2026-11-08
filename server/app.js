@@ -28,7 +28,7 @@ import addressRoutes from './routes/addresses.js';
  * same browser.
  */
 export function createApp({ surface = 'store' } = {}) {
-  // 'all' serves both surfaces from one origin (the serverless deployment).
+  // 'all' serves both surfaces from one origin, e.g. a single domain or a single VPS.
   const isAdminSurface = surface === 'admin';
   const isCombined = surface === 'all';
   const app = express();
@@ -109,7 +109,7 @@ export function createApp({ surface = 'store' } = {}) {
     app.use('/api/wishlist', apiLimiter, wishlistRoutes);
     app.use('/api/addresses', apiLimiter, addressRoutes);
 
-    // Uploaded photos live in blob storage on serverless; stream them back here.
+    // When uploads are stored outside the local filesystem, stream them back here.
     app.get('/api/uploads/:key', asyncHandler(async (req, res) => {
       const file = await readUpload(req.params.key);
       if (!file) throw notFound('Image not found');

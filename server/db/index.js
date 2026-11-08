@@ -6,7 +6,7 @@ import { config } from '../config.js';
 let instance = null;
 let blobStore = null;
 
-/** On Netlify the database lives in Netlify Blobs rather than on disk. */
+/** Optional object store: when supplied, the database is kept there instead of on disk. */
 export function useBlobStore(store) {
   blobStore = store;
 }
@@ -16,14 +16,13 @@ const BLOB_KEY = 'shopfront.db';
 /**
  * Locates sql.js' WebAssembly binary.
  *
- * Bundlers rewrite `require.resolve`, so this only probes real filesystem paths:
- * the local node_modules, and /var/task where Netlify unpacks included_files.
+ * Bundlers rewrite `require.resolve`, so this probes real filesystem paths only:
+ * the local node_modules, relative to the working directory.
  */
 function wasmDir() {
   const candidates = [
     path.join(process.cwd(), 'node_modules/sql.js/dist'),
     path.join(process.cwd(), '..', 'node_modules/sql.js/dist'),
-    '/var/task/node_modules/sql.js/dist',
   ];
   return candidates.find((dir) => {
     try { return fs.existsSync(path.join(dir, 'sql-wasm.wasm')); } catch { return false; }

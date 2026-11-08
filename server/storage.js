@@ -6,9 +6,9 @@ import { config } from './config.js';
 /**
  * File storage for product photos.
  *
- * Locally this writes to public/uploads. On Netlify the filesystem is read-only
- * and per-instance, so blobs go to Netlify Blobs and are streamed back through
- * the API instead.
+ * By default this writes to public/uploads. If an object store is supplied
+ * (see useBlobStore), files go there instead and are streamed back through the
+ * API, which is what you want on a host with no persistent filesystem.
  */
 let blobStore = null;
 

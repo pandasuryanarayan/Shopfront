@@ -26,7 +26,7 @@ loadEnvFile();
 /**
  * Project root. Resolved from the working directory rather than import.meta.url,
  * because serverless bundlers compile this to CommonJS where import.meta is
- * undefined. Both `npm start` and the Netlify function run with the root as cwd.
+ * undefined. The app is always started from the project root.
  */
 function findRoot() {
   const candidates = [process.env.APP_ROOT, process.cwd(), path.resolve(process.cwd(), '..')].filter(Boolean);
