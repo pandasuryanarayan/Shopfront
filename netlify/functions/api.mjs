@@ -15,9 +15,16 @@ import { useBlobStore as useUploadStore } from '../../server/storage.js';
 let booted;
 
 async function bootstrap() {
-  const store = getStore({ name: 'shopfront', consistency: 'strong' });
-  useBlobStore(store);
-  useUploadStore(store);
+  // Blobs is available automatically inside Netlify Functions. If it is not,
+  // fall back to the ephemeral /tmp filesystem so the site still boots.
+  try {
+    const store = getStore({ name: 'shopfront', consistency: 'strong' });
+    useBlobStore(store);
+    useUploadStore(store);
+  } catch (err) {
+    console.warn('Blobs unavailable, falling back to /tmp:', err?.message);
+    process.env.DB_FILE = '/tmp/shopfront.db';
+  }
 
   await openDatabase();
   const db = getDb();
