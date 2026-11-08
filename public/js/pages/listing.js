@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { mountChrome, boot, productCard, skeletonCards, qs, qsa, esc, money, handleError, icon } from '../ui.js';
+import { mountChrome, boot, productCard, skeletonCards, qs, qsa, esc, money, handleError, icon, setPageTitle } from '../ui.js';
 
 mountChrome({ active: '' });
 boot();
@@ -193,7 +193,7 @@ async function update() {
     qs('#page-sub').textContent = `${data.total} product${data.total === 1 ? '' : 's'}  ·  Free delivery over ₹499`;
     const apply = qs('#sheet-apply');
     if (apply) apply.textContent = `Show ${data.total} product${data.total === 1 ? '' : 's'}`;
-    document.title = `${title} — Shopfront`;
+    setPageTitle(title);
 
     qs('#grid').innerHTML = data.items.length
       ? data.items.map(productCard).join('')

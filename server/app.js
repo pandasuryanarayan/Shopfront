@@ -7,6 +7,7 @@ import { optionalAuth } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { asyncHandler, notFound } from './lib/errors.js';
 import { readUpload } from './storage.js';
+import { getSettings } from './services/settings.js';
 import authRoutes from './routes/auth.js';
 import catalogRoutes from './routes/catalog.js';
 import cartRoutes from './routes/cart.js';
@@ -76,6 +77,17 @@ export function createApp({ surface = 'store' } = {}) {
     })
   );
 
+  // Public branding/runtime config — no auth, no secrets.
+  app.get('/api/config', (_req, res) => {
+    const settings = getSettings();
+    res.json({
+      shopName: settings.storeName,
+      currency: settings.currency,
+      supportEmail: settings.supportEmail,
+      freeDeliveryThreshold: settings.freeDeliveryThreshold,
+    });
+  });
+
   app.use('/api/auth', authLimiter, authRoutes);
 
   if (isAdminSurface || isCombined) {
@@ -109,7 +121,9 @@ export function createApp({ surface = 'store' } = {}) {
 
   if (isAdminSurface || isCombined) {
     const page = (name) => (_req, res) => res.sendFile(name, { root: config.publicDir });
-    app.get(['/', '/mukhiya'], page('admin.html'));
+    // On the admin origin "/" is the panel; on the combined origin it is the shop,
+    // so only the admin surface claims the root path.
+    app.get(isAdminSurface ? ['/', '/mukhiya'] : ['/mukhiya'], page('admin.html'));
     app.get('/admin.html', (_req, res) => res.redirect(301, '/mukhiya'));
     app.get('/login.html', page('login.html'));
     app.get('/404.html', page('404.html'));

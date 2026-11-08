@@ -1,9 +1,57 @@
 import { api, ApiError } from './api.js';
 import { store } from './store.js';
 
-/* ---------- formatting ---------- */
-export const money = (paise) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format((paise || 0) / 100);
+/* ---------- branding & formatting ---------- */
+let SHOP_NAME = 'Shopfront';
+let currencyCode = 'INR';
+
+export const shopName = () => SHOP_NAME;
+
+/** Currency comes from the server config, so a shop can price in any currency. */
+export function setCurrency(code) {
+  if (code) currencyCode = String(code).toUpperCase();
+}
+
+export const money = (paise) => {
+  const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
+  try {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: currencyCode, maximumFractionDigits: 0 })
+      .format((paise || 0) / 100);
+  } catch {
+    return `${currencyCode} ${Math.round((paise || 0) / 100).toLocaleString(locale)}`;
+  }
+};
+
+/** Sets a page title using the configured shop name. */
+export function setPageTitle(text) {
+  document.title = `${text} — ${SHOP_NAME}`;
+}
+
+/** Repaints every brand marker with the configured shop name. */
+function paintBranding() {
+  document.querySelectorAll('[data-brand]').forEach((el) => { el.textContent = SHOP_NAME; });
+  document.querySelectorAll('[data-brand-mark]').forEach((el) => {
+    el.textContent = (SHOP_NAME.trim()[0] || 'S').toUpperCase();
+  });
+  document.title = document.title.replace(/Shopfront/g, SHOP_NAME);
+}
+
+/**
+ * Loads public branding from the server. Safe to call on any page: on failure
+ * the defaults stay, so the UI never blocks on it.
+ */
+export async function loadBranding() {
+  try {
+    const cfg = await api.publicConfig();
+    if (cfg?.shopName) SHOP_NAME = cfg.shopName;
+    setCurrency(cfg?.currency);
+    globalThis.__shopConfig = cfg;
+  } catch {
+    /* keep defaults */
+  }
+  paintBranding();
+  return SHOP_NAME;
+}
 
 export const esc = (value) =>
   String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -194,7 +242,7 @@ export function mountChrome({ active = '', storeUrl = '' } = {}) {
   header.className = 'site-header';
   header.innerHTML = `
     <div class="container header-inner">
-      <a class="brand" href="${shop('/')}"><span class="brand-mark">S</span>Shopfront</a>
+      <a class="brand" href="${shop('/')}"><span class="brand-mark" data-brand-mark>S</span><span data-brand>Shopfront</span></a>
       <nav class="main-nav" id="main-nav" aria-label="Primary">
         ${NAV.map(([label, link]) => `<a href="${shop(link)}"${label === active ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
       </nav>
@@ -227,7 +275,7 @@ export function mountChrome({ active = '', storeUrl = '' } = {}) {
     <div class="container">
       <div class="footer-grid">
         <div>
-          <a class="brand" href="${shop('/')}" style="color:#fff"><span class="brand-mark">S</span>Shopfront</a>
+          <a class="brand" href="${shop('/')}" style="color:#fff"><span class="brand-mark" data-brand-mark>S</span><span data-brand>Shopfront</span></a>
           <p style="margin-top:12px;max-width:34ch;font-size:14px">Thoughtfully made goods, delivered across India. Free delivery over ₹499 and 7-day returns on everything.</p>
         </div>
         <div><h4>Shop</h4><a href="${shop('/products.html?sort=newest')}">New arrivals</a><a href="${shop('/products.html?category=footwear')}">Footwear</a><a href="${shop('/products.html?category=apparel')}">Apparel</a><a href="${shop('/products.html?category=home')}">Home</a></div>
@@ -235,7 +283,7 @@ export function mountChrome({ active = '', storeUrl = '' } = {}) {
         <div><h4>Company</h4><a href="${shop('/')}">About</a><a href="${shop('/')}">Careers</a><a href="${shop('/')}">Privacy</a><a href="${shop('/')}">Terms</a></div>
       </div>
       <div class="footer-bottom">
-        <span>© ${new Date().getFullYear()} Shopfront Retail Pvt Ltd · Bengaluru, India</span>
+        <span>© ${new Date().getFullYear()} <span data-brand>Shopfront</span> Retail Pvt Ltd</span>
         <span>UPI · Visa · Mastercard · RuPay · COD</span>
       </div>
     </div>`;
@@ -423,13 +471,14 @@ export function mountChrome({ active = '', storeUrl = '' } = {}) {
 
   store.subscribe(render);
   render();
+  paintBranding();
 
   return { render };
 }
 
 /** Boots shared state: current user + cart badge. Safe to call on every page. */
 export async function boot() {
-  const [me, cart] = await Promise.allSettled([api.me(), api.cart()]);
+  const [me, cart] = await Promise.allSettled([api.me(), api.cart(), loadBranding()]);
   store.setUser(me.status === 'fulfilled' ? me.value.user : null);
   store.setCartCount(cart.status === 'fulfilled' ? cart.value.summary.itemCount : 0);
 

@@ -2,17 +2,19 @@
   "name": "shopfront",
   "version": "1.0.0",
   "private": true,
-  "description": "Shopfront — a production-grade e-commerce web application (Node.js, Express, SQLite, vanilla HTML/CSS/JS)",
+  "description": "Shopfront \u2014 a production-grade e-commerce web application (Node.js, Express, SQLite, vanilla HTML/CSS/JS)",
   "type": "module",
   "main": "server/index.js",
   "engines": {
     "node": ">=18.17"
   },
   "scripts": {
+    "setup": "node setup.js",
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "seed": "node server/db/seed.js",
-    "test": "node --test tests/"
+    "test": "node --test tests/",
+    "build": "node -e \"console.log('Shopfront has no build step \u2014 configuration is read at runtime')\""
   },
   "dependencies": {
     "@netlify/blobs": "^10.7.13",

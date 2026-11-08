@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { mountChrome, boot, qs, qsa, esc, money, productArt, productCard, toast, handleError, isSaved } from '../ui.js';
+import { mountChrome, boot, qs, qsa, esc, money, productArt, productCard, toast, handleError, isSaved, setPageTitle } from '../ui.js';
 import { store } from '../store.js';
 
 mountChrome();
@@ -45,7 +45,7 @@ function render(data) {
   const { product, reviews, related } = data;
   const firstAvailable = product.sizes.find((s) => s.inStock)?.label || product.sizes[0]?.label || 'One size';
 
-  document.title = `${product.title} — Shopfront`;
+  setPageTitle(product.title);
 
   root.innerHTML = `
     <nav class="breadcrumb" aria-label="Breadcrumb">

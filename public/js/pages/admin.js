@@ -1,5 +1,5 @@
 import { api, uploadProductImage, setSurface } from '../api.js';
-import { qs, qsa, esc, money, statusBadge, toast, handleError, icon, debounce } from '../ui.js';
+import { qs, qsa, esc, money, statusBadge, toast, handleError, icon, debounce, loadBranding, shopName } from '../ui.js';
 import { store } from '../store.js';
 
 setSurface('admin');
@@ -39,7 +39,7 @@ function shell(content) {
   const allowed = NAV.filter(([, , scope]) => scope === 'any' || isOwner);
   root.innerHTML = `
     <aside class="admin-side">
-      <a class="brand" href="${esc(storeUrl || '/')}"><span class="brand-mark">S</span>Shopfront</a>
+      <a class="brand" href="${esc(storeUrl || '/')}"><span class="brand-mark" data-brand-mark>S</span><span data-brand>${esc(shopName())}</span></a>
       <nav class="admin-nav">
         <span class="label">Menu</span>
         ${allowed.slice(0, 4).map(([key, label]) => `
@@ -987,6 +987,7 @@ async function init() {
   }
 
   isOwner = store.user.role === 'admin';
+  await loadBranding();
   const config = await api.adminConfig();
   storeUrl = config.storeUrl;
 

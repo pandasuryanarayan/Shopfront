@@ -57,6 +57,8 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/auth/me'),
 
+  publicConfig: () => request('/config'),
+
   // catalogue
   categories: () => request('/categories'),
   products: (params) => request(`/products${qs(params)}`),

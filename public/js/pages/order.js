@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { mountChrome, boot, qs, qsa, esc, money, statusBadge, toast, handleError, icon } from '../ui.js';
+import { mountChrome, boot, qs, qsa, esc, money, statusBadge, toast, handleError, icon, setPageTitle } from '../ui.js';
 
 mountChrome();
 const user = await boot();
@@ -44,7 +44,7 @@ function render() {
   const daysOld = (Date.now() - new Date(`${order.createdAt.replace(' ', 'T')}Z`).getTime()) / 86400000;
   const withinWindow = daysOld <= 7;
 
-  document.title = `${order.reference} — Shopfront`;
+  setPageTitle(order.reference);
 
   root.innerHTML = `
     <nav class="breadcrumb"><a href="/orders.html">Your orders</a><span>/</span><span class="current">${esc(order.reference)}</span></nav>

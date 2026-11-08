@@ -2,6 +2,28 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
+ * Minimal .env loader (no dependency). Values already present in the real
+ * environment always win, so a hosting dashboard overrides the local file.
+ */
+function loadEnvFile() {
+  for (const candidate of ['.env', path.join('..', '.env')]) {
+    const file = path.resolve(process.cwd(), candidate);
+    if (!fs.existsSync(file)) continue;
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i);
+      if (!match) continue;
+      const [, key, rawValue] = match;
+      if (process.env[key] !== undefined) continue;
+      const value = rawValue.replace(/^["']|["']$/g, '').trim();
+      if (value) process.env[key] = value;
+    }
+    return;
+  }
+}
+
+loadEnvFile();
+
+/**
  * Project root. Resolved from the working directory rather than import.meta.url,
  * because serverless bundlers compile this to CommonJS where import.meta is
  * undefined. Both `npm start` and the Netlify function run with the root as cwd.
@@ -38,7 +60,14 @@ export const config = {
   guestCookieName: 'sf_guest',
   uploadDir: 'public/uploads',
   cookieSecure: env === 'production',
-  currency: 'INR',
+  // Branding and pricing defaults. These seed the settings table on a fresh
+  // database; after that the admin Settings page is the source of truth.
+  shopName: process.env.SHOP_NAME || 'Shopfront',
+  currency: (process.env.CURRENCY || 'INR').toUpperCase(),
+  supportEmail: process.env.SUPPORT_EMAIL || 'help@shopfront.in',
+  taxPercent: process.env.TAX_PERCENT || '18',
+  freeDeliveryThreshold: process.env.FREE_DELIVERY_THRESHOLD || '49900',
+  deliveryFee: process.env.DELIVERY_FEE || '4900',
   freeDeliveryThresholdPaise: 49900,
   deliveryFeePaise: 4900,
   maxCartQty: 10,

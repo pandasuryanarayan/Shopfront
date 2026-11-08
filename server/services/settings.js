@@ -1,12 +1,17 @@
 import { getDb } from '../db/index.js';
+import { config } from '../config.js';
 
+/**
+ * Defaults for a fresh database. A shop owner sets these once as environment
+ * variables on their host; the admin Settings page can change them afterwards.
+ */
 export const DEFAULTS = {
-  storeName: 'Shopfront',
-  currency: 'INR',
-  supportEmail: 'help@shopfront.in',
-  taxPercent: '18',
-  freeDeliveryThreshold: '49900',
-  deliveryFee: '4900',
+  storeName: config.shopName,
+  currency: config.currency,
+  supportEmail: config.supportEmail,
+  taxPercent: String(config.taxPercent),
+  freeDeliveryThreshold: String(config.freeDeliveryThreshold),
+  deliveryFee: String(config.deliveryFee),
 };
 
 /** Settings are stored as strings; this coerces the numeric ones on read. */
