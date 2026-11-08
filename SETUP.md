@@ -145,6 +145,60 @@ If that sounds like more than you need, keep one deployment and use
 
 ---
 
+## Where your data lives
+
+**On your own machine** — nothing to configure. `npm run setup` puts everything
+inside the project folder:
+
+| What | Where |
+| --- | --- |
+| Database | `data/shopfront.db` |
+| Uploaded photos | `public/uploads/` |
+| Settings | inside the database |
+
+**On a server** — point these at a volume that survives redeploys, so your
+products and orders are not wiped when the app restarts:
+
+| Variable | What it does | Example |
+| --- | --- | --- |
+| `DATA_DIR` | Folder holding the database | `/var/shopfront` |
+| `DB_FILE` | Full path to the database file (overrides `DATA_DIR`) | `/var/shopfront/shopfront.db` |
+| `UPLOAD_DIR` | Where uploaded photos are written | `/var/shopfront/uploads` |
+
+If you set none of them, the app uses the local defaults, which is fine on a
+machine you control but risky on a host that rebuilds its filesystem.
+
+### Choosing a database
+
+The app ships with SQLite — a database that is a single file. For a shop with a
+handful of staff and ordinary traffic this is genuinely fine, and it is why the
+project needs no database server to run.
+
+Two things to know before you grow:
+
+1. **Only one instance may write at a time.** Run a single copy of the app
+   against the file. Do not run three replicas behind a load balancer pointing at
+   the same file — they will overwrite each other.
+2. **Back it up by copying the file** (plus `UPLOAD_DIR`). That is the whole
+   backup. Do it on a schedule.
+
+If you outgrow that — many concurrent orders, multiple app servers, a team
+wanting a managed database — you need a client-server database such as
+PostgreSQL. **That is not supported out of the box**: the data layer is written
+against SQLite, so switching engines is a code change, not a setting. If you get
+to that point, that is the moment to bring in a developer (or ask for the
+migration) rather than to keep scaling the single file.
+
+### Hosting without a disk
+
+Some hosts give you no persistent filesystem at all — only functions. There, the
+database and uploads have to live in object storage. The hooks exist:
+`useBlobStore(store)` in `server/db/index.js` and `server/storage.js` accept any
+object store, and you supply a small entry point that calls `createApp()`.
+Treat that as an advanced path; a small server with a disk is simpler.
+
+---
+
 ## Before you take real orders
 
 1. **Change the demo passwords** — the admin account shipped with `Admin@1234`.

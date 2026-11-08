@@ -99,6 +99,9 @@ npm start
 | `PORT` / `ADMIN_PORT` | Ports for the two surfaces | `4000` / `4001` |
 | `TAX_PERCENT` | Tax applied at checkout | `18` |
 | `FREE_DELIVERY_THRESHOLD` / `DELIVERY_FEE` | Delivery rules, in paise | `49900` / `4900` |
+| `DATA_DIR` / `DB_FILE` | Where the database lives — point at a volume in production | `./data` |
+| `UPLOAD_DIR` | Where uploaded photos are written | `./public/uploads` |
+| `COOKIE_SECURE` | Force Secure cookies on/off | follows `NODE_ENV` |
 
 Nothing about your shop is hardcoded in the frontend: branding and currency are
 read at runtime from `/api/config`, so changing a variable needs no rebuild.

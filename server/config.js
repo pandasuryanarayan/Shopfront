@@ -52,14 +52,22 @@ export const config = {
   adminPort: Number(process.env.ADMIN_PORT ?? 4001),
   root,
   publicDir: path.join(root, 'public'),
-  dbFile: process.env.DB_FILE || path.join(root, 'data', 'shopfront.db'),
+
+  // ---- storage -----------------------------------------------------------
+  // Local default: everything lives inside the project, so a fresh clone works
+  // with no configuration at all. In production point these at a mounted volume
+  // (or an object store via useBlobStore) — no code changes needed.
+  dataDir: path.resolve(process.env.DATA_DIR || path.join(root, 'data')),
+  dbFile: path.resolve(process.env.DB_FILE || path.join(process.env.DATA_DIR || path.join(root, 'data'), 'shopfront.db')),
+  uploadDir: path.resolve(process.env.UPLOAD_DIR || path.join(root, 'public', 'uploads')),
   jwtSecret,
   jwtTtl: process.env.JWT_TTL || '7d',
   cookieName: 'sf_token',
   adminCookieName: 'sf_admin_token',
   guestCookieName: 'sf_guest',
-  uploadDir: 'public/uploads',
-  cookieSecure: env === 'production',
+  // Secure cookies need HTTPS. Defaults to on in production; set COOKIE_SECURE=false
+  // if you terminate TLS elsewhere and serve plain HTTP internally.
+  cookieSecure: (process.env.COOKIE_SECURE ?? String(env === 'production')) === 'true',
   // Branding and pricing defaults. These seed the settings table on a fresh
   // database; after that the admin Settings page is the source of truth.
   shopName: process.env.SHOP_NAME || 'Shopfront',
@@ -68,9 +76,7 @@ export const config = {
   taxPercent: process.env.TAX_PERCENT || '18',
   freeDeliveryThreshold: process.env.FREE_DELIVERY_THRESHOLD || '49900',
   deliveryFee: process.env.DELIVERY_FEE || '4900',
-  freeDeliveryThresholdPaise: 49900,
-  deliveryFeePaise: 4900,
-  maxCartQty: 10,
+  maxCartQty: Number(process.env.MAX_CART_QTY || 10),
 };
 
 config.adminPublicUrl = process.env.ADMIN_PUBLIC_URL || `http://localhost:${config.adminPort}`;

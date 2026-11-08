@@ -34,7 +34,7 @@ export async function saveUpload({ buffer, originalname, mimetype }) {
     return `/api/uploads/${key}`;
   }
 
-  const dir = path.join(config.root, config.uploadDir);
+  const dir = path.resolve(config.uploadDir);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, key), buffer);
   return `/uploads/${key}`;
@@ -51,7 +51,7 @@ export async function readUpload(key) {
     };
   }
 
-  const file = path.join(config.root, config.uploadDir, path.basename(key));
+  const file = path.join(config.uploadDir, path.basename(key));
   if (!fs.existsSync(file)) return null;
   return { buffer: fs.readFileSync(file), contentType: 'image/jpeg' };
 }
@@ -63,5 +63,5 @@ export async function deleteUpload(url) {
     await blobStore.delete(key).catch(() => {});
     return;
   }
-  fs.rm(path.join(config.root, config.uploadDir, key), { force: true }, () => {});
+  fs.rm(path.join(config.uploadDir, path.basename(key)), { force: true }, () => {});
 }
