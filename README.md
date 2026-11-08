@@ -4,10 +4,6 @@ A complete, production-minded e-commerce application: storefront, cart, checkout
 management and an admin dashboard. Built with **Node.js + Express + SQLite** on the back end
 and **plain HTML, CSS and JavaScript** (no framework, no build step) on the front end.
 
-The UI follows a design system that lives in Figma — tokens, components and six screens:
-
-> **Figma:** https://www.figma.com/design/uUwFz57dQ4bbSSxSQhLZuD
-
 ---
 
 ## What's inside
@@ -62,9 +58,8 @@ The UI follows a design system that lives in Figma — tokens, components and si
 **Deploying**
 
 Provider-agnostic. Any host that runs Node works as-is; any static host with
-serverless functions can serve the frontend with the API as one function
-(`netlify.toml` is a working example). Environment variables come from the host's
-dashboard, never from committed files. See [SETUP.md](SETUP.md) for both routes,
+serverless functions can serve the frontend with the API as a single function.
+Environment variables come from the host's dashboard, never from committed files. See [SETUP.md](SETUP.md) for both routes,
 two-domain setups and a pre-launch checklist.
 
 **Engineering**

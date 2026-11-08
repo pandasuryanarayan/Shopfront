@@ -103,10 +103,20 @@ runs a `start` command) works with no changes.
 
 ### Option B — a static host with serverless functions
 
-The frontend is plain HTML/CSS/JS, so it can sit on a CDN, with the API running
-as a single serverless function. `netlify.toml` is included as a working
-example; the same shape works on any platform that supports a publish directory
-plus functions.
+The frontend is plain HTML/CSS/JS, so it can sit on a CDN with the API running
+as a single serverless function. This works on any platform that supports a
+publish directory plus functions; the configuration is the same shape
+everywhere:
+
+- publish directory: `public`
+- one serverless function wrapping the Express app (`createApp()` in `server/app.js`)
+- API route: `/api/*` forwarded to that function
+- admin route: `/mukhiya` served from `public/mukhiya.html`
+
+The function entry point is the only file you need to add for your platform. It
+boots the database, calls `createApp()`, and hands the request to the runtime.
+Uploads and the database need somewhere durable on a serverless host — any
+object store works, wired up through `useBlobStore()` in `server/db/index.js`.
 
 1. Create a new site from your fork.
 2. Publish directory: `public`
