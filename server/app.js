@@ -65,8 +65,15 @@ export function createApp({ surface = 'store' } = {}) {
     message: { error: { code: 'RATE_LIMITED', message: 'Too many attempts. Try again in a few minutes.' } },
   });
 
-  app.get('/healthz', (_req, res) =>
-    res.json({ ok: true, surface, uptime: process.uptime(), ...(isAdminSurface ? { storeUrl: config.storePublicUrl } : {}) })
+  app.get(['/healthz', '/api/healthz'], (_req, res) =>
+    res.json({
+      ok: true,
+      surface,
+      uptime: process.uptime(),
+      storage: globalThis.__storageMode || 'disk',
+      storageError: globalThis.__storageError || null,
+      ...(isAdminSurface ? { storeUrl: config.storePublicUrl } : {}),
+    })
   );
 
   app.use('/api/auth', authLimiter, authRoutes);

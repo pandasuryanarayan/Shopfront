@@ -1,5 +1,4 @@
 import serverless from 'serverless-http';
-import { getStore } from '@netlify/blobs';
 import { createApp } from '../../server/app.js';
 import { openDatabase, getDb, useBlobStore } from '../../server/db/index.js';
 import { seed } from '../../server/db/seed.js';
@@ -8,25 +7,56 @@ import { useBlobStore as useUploadStore } from '../../server/storage.js';
 /**
  * Netlify Function entry point.
  *
- * The whole Express app runs here on a single origin; the database and uploaded
- * photos are persisted in Netlify Blobs, because the function filesystem is
- * read-only and per-instance.
+ * The whole Express app runs here on a single origin. The database and uploaded
+ * photos live in Netlify Blobs, because the function filesystem is read-only and
+ * per-instance. If Blobs cannot be reached the app still boots — it just falls
+ * back to an in-memory database so the site serves instead of returning 502.
  */
 let booted;
 
+async function resolveStore() {
+  const { getStore } = await import('@netlify/blobs');
+  const attempts = [
+    ['object+consistency', () => getStore({ name: 'shopfront', consistency: 'strong' })],
+    ['string', () => getStore('shopfront')],
+    ['env', () => getStore({
+      name: 'shopfront',
+      siteID: process.env.SITE_ID || process.env.NETLIFY_SITE_ID,
+      token: process.env.NETLIFY_BLOBS_TOKEN,
+    })],
+  ];
+
+  let lastError = null;
+  for (const [label, make] of attempts) {
+    try {
+      const candidate = make();
+      await candidate.get('__probe__'); // forces a real call so misconfig surfaces here
+      console.log(`blobs: connected via ${label}`);
+      return candidate;
+    } catch (err) {
+      lastError = err;
+      console.warn(`blobs: ${label} failed — ${err?.message}`);
+    }
+  }
+  throw lastError || new Error('Blobs unavailable');
+}
+
 async function bootstrap() {
-  // Blobs is available automatically inside Netlify Functions. If it is not,
-  // fall back to the ephemeral /tmp filesystem so the site still boots.
+  let store = null;
   try {
-    const store = getStore({ name: 'shopfront', consistency: 'strong' });
+    store = await resolveStore();
     useBlobStore(store);
     useUploadStore(store);
+    globalThis.__storageMode = 'blob';
   } catch (err) {
-    console.warn('Blobs unavailable, falling back to /tmp:', err?.message);
-    process.env.DB_FILE = '/tmp/shopfront.db';
+    globalThis.__storageMode = 'memory';
+    globalThis.__storageError = String(err?.message || err);
+    console.warn('Running without blob storage:', globalThis.__storageError);
   }
 
-  await openDatabase();
+  // Without blobs there is nowhere durable to write, so stay in memory.
+  await openDatabase(store ? {} : { inMemory: true });
+
   const db = getDb();
   if (db.get('SELECT COUNT(*) AS n FROM products').n === 0) {
     await seed({ silent: true });
@@ -41,7 +71,6 @@ export async function handler(event, context) {
   const fn = await booted;
   const response = await fn(event, context);
 
-  // Persist after the response is built, before the instance can freeze.
   try {
     await getDb().persist();
   } catch (err) {

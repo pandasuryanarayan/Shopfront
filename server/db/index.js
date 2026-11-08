@@ -98,12 +98,18 @@ class Database {
     // With a blob store the bytes are uploaded after the request finishes.
     if (blobStore) return;
     if (!this.dirty || !this.file) return;
-    const dir = path.dirname(this.file);
-    fs.mkdirSync(dir, { recursive: true });
-    const tmp = `${this.file}.tmp`;
-    fs.writeFileSync(tmp, Buffer.from(this.db.export()));
-    fs.renameSync(tmp, this.file);
-    this.dirty = false;
+    try {
+      const dir = path.dirname(this.file);
+      fs.mkdirSync(dir, { recursive: true });
+      const tmp = `${this.file}.tmp`;
+      fs.writeFileSync(tmp, Buffer.from(this.db.export()));
+      fs.renameSync(tmp, this.file);
+      this.dirty = false;
+    } catch (err) {
+      // Read-only filesystem (serverless): the blob store is the real backing
+      // store; keep serving from memory rather than failing the request.
+      console.warn('disk flush skipped:', err?.code || err?.message);
+    }
   }
 
   close() {
@@ -113,7 +119,11 @@ class Database {
 
   /** Uploads the database to the blob store when it has changed. */
   async persist() {
-    if (!blobStore || !this.dirty) return false;
+    if (!blobStore) {
+      this.flush();
+      return false;
+    }
+    if (!this.dirty) return false;
     const bytes = Buffer.from(this.db.export());
     await blobStore.set(BLOB_KEY, bytes, { metadata: { contentType: 'application/x-sqlite3' } });
     this.dirty = false;
