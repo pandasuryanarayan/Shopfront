@@ -4,8 +4,9 @@
 
 [functions]
   directory = "netlify/functions"
-  # zisi keeps node_modules intact so sql.js can locate its wasm file at runtime
-  node_bundler = "zisi"
+  # esbuild bundles the ESM entry point (zisi wraps it in require(), which fails)
+  node_bundler = "esbuild"
+  # sql.js loads its wasm at runtime; ship it alongside the bundle
   included_files = ["node_modules/sql.js/dist/sql-wasm.wasm"]
 
 [[redirects]]

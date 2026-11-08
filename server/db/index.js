@@ -1,10 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import initSqlJs from 'sql.js';
 import { config } from '../config.js';
-
-const require = createRequire(import.meta.url);
 
 let instance = null;
 let blobStore = null;
@@ -16,17 +13,22 @@ export function useBlobStore(store) {
 
 const BLOB_KEY = 'shopfront.db';
 
-/** Finds sql.js' wasm file whether we run from source or a bundled function. */
+/**
+ * Locates sql.js' WebAssembly binary.
+ *
+ * Bundlers rewrite `require.resolve`, so this only probes real filesystem paths:
+ * the local node_modules, and /var/task where Netlify unpacks included_files.
+ */
 function wasmDir() {
-  const candidates = [];
-  try {
-    candidates.push(path.dirname(require.resolve('sql.js/dist/sql-wasm.js')));
-  } catch {
-    /* bundled: require.resolve may not work */
-  }
-  candidates.push(path.join(process.cwd(), 'node_modules/sql.js/dist'));
-  candidates.push('/var/task/node_modules/sql.js/dist');
-  return candidates.find((dir) => fs.existsSync(path.join(dir, 'sql-wasm.wasm'))) || candidates[0];
+  const candidates = [
+    path.join(process.cwd(), 'node_modules/sql.js/dist'),
+    path.join(process.cwd(), '..', 'node_modules/sql.js/dist'),
+    '/var/task/node_modules/sql.js/dist',
+    path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'node_modules/sql.js/dist'),
+  ];
+  return candidates.find((dir) => {
+    try { return fs.existsSync(path.join(dir, 'sql-wasm.wasm')); } catch { return false; }
+  }) || candidates[0];
 }
 
 const normalise = (params = []) =>
